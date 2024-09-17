@@ -1,7 +1,7 @@
 package com.backend.ecommerce.service;
 
-import com.backend.ecommerce.dto.ProductDTO;
 import com.backend.ecommerce.entity.Product;
+import com.backend.ecommerce.records.ProductDTO;
 import com.backend.ecommerce.records.ProductResponse;
 
 import java.util.List;

@@ -1,7 +1,7 @@
 package com.backend.ecommerce.implementation;
 
-import com.backend.ecommerce.dto.ProductDTO;
 import com.backend.ecommerce.mapper.ProductMapper;
+import com.backend.ecommerce.records.ProductDTO;
 import com.backend.ecommerce.records.ProductResponse;
 import com.backend.ecommerce.entity.Category;
 import com.backend.ecommerce.entity.Product;

@@ -1,19 +1,16 @@
 package com.backend.ecommerce.controllers;
 
 
-import com.backend.ecommerce.dto.ProductDTO;
 import com.backend.ecommerce.implementation.ProductServiceImplementation;
 import com.backend.ecommerce.mapper.ProductMapper;
+import com.backend.ecommerce.records.ProductDTO;
 import com.backend.ecommerce.records.ProductResponse;
 import com.backend.ecommerce.entity.Product;
 import com.backend.ecommerce.service.CategoryService;
-import com.backend.ecommerce.service.ProductService;
 import com.backend.ecommerce.utility.AppConstants;
-import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

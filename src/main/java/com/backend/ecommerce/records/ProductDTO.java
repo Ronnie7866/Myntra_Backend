@@ -1,4 +1,4 @@
-package com.backend.ecommerce.dto;
+package com.backend.ecommerce.records;
 
 import com.backend.ecommerce.entity.ProductImageTable;
 import com.backend.ecommerce.entity.Rating;
