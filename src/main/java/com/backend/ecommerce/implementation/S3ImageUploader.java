@@ -4,7 +4,10 @@ import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.*;
+import com.backend.ecommerce.entity.Product;
 import com.backend.ecommerce.exception.ImageUploadException;
+import com.backend.ecommerce.mapper.ProductMapper;
+import com.backend.ecommerce.records.ProductDTO;
 import com.backend.ecommerce.service.ImageUploader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,11 +26,20 @@ public class S3ImageUploader implements ImageUploader {
     @Autowired
     private AmazonS3 client;
 
+    @Autowired
+    private ProductServiceImplementation productService;
+
+    @Autowired
+    private ProductMapper productMapper;
+
     @Value("${app.s3.bucket}")
     private String bucketName;
 
     @Override
-    public String uploadImage(MultipartFile image) {
+    public String uploadImage(MultipartFile image, Long productId) {
+
+        Product product;
+
         String actualFilename = image.getOriginalFilename();
         String fileName = UUID.randomUUID().toString() + actualFilename.substring(actualFilename.lastIndexOf("."));
 
@@ -37,8 +49,11 @@ public class S3ImageUploader implements ImageUploader {
 
 
         try {
+            product = productMapper.reverse(productService.getProductById(productId));
             PutObjectResult putObjectResult = client.putObject(new PutObjectRequest(bucketName, fileName, image.getInputStream(), metadata));
-            return this.preSignedUrl(fileName);
+            product.setImageURL(fileName);
+            productService.createProduct(product);
+            return fileName;
         } catch (IOException e) {
             throw new ImageUploadException("Error while uploading image " + e.getMessage());
         }

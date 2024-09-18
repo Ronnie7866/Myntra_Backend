@@ -21,8 +21,9 @@ public class S3Controller {
     }
 
     @PostMapping
-    public ResponseEntity<?> uploadImage(@RequestParam MultipartFile file) {
-        return ResponseEntity.ok(uploader.uploadImage(file));
+    public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file,
+                                         @RequestParam("productId") Long productId) {
+        return ResponseEntity.ok(uploader.uploadImage(file, productId));
     }
 
     @GetMapping

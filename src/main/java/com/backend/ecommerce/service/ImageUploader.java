@@ -5,7 +5,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 public interface ImageUploader {
-    String uploadImage(MultipartFile image);
+    String uploadImage(MultipartFile image, Long productId);
 
     List<String> allImages();
 
