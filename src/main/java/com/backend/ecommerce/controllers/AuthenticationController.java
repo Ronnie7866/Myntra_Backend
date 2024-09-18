@@ -41,8 +41,8 @@ public class AuthenticationController {
 
     @PostMapping("/register")
     public ResponseEntity<AuthenticationResponse> register(@RequestBody RegisterRequest request) {
-        System.out.println("Entered register request");
-        return ResponseEntity.ok(authenticationService.register(request));
+        AuthenticationResponse registered = authenticationService.register(request);
+        return new ResponseEntity<>(registered, HttpStatus.CREATED);
 
     }
 

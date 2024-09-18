@@ -10,6 +10,7 @@ import com.backend.ecommerce.records.ProductImageDTO;
 import com.backend.ecommerce.service.ProductImageService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.AllArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -27,11 +28,10 @@ import java.util.List;
 public class ProductImageController {
 
 
+    @Autowired
     private final FileServiceImplementation fileService;
-    private final ProductImageServiceImpl productImageServiceImpl;
-    private ProductImageService productImageService;
-    private final ProductImageMapper productImageMapper;
-    private final ProductServiceImplementation productService;
+    @Autowired
+    private final  ProductImageServiceImpl productImageService;
 
 
     @PostMapping("/upload")

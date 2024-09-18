@@ -53,4 +53,9 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleProductReviewNotFoundException(Exception exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
     }
+
+    @ExceptionHandler(ImageUploadException.class)
+    public ProblemDetail handleImageUploadException(Exception exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, exception.getMessage());
+    }
 }

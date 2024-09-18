@@ -28,11 +28,8 @@ public class ProductImageServiceImpl implements ProductImageService {
     private final ProductImageRepository productImageRepository;
     private final ProductRepository productRepository;
     private final FileServiceImplementation fileService;
-//    private final String uploadDir = "uploads/";
+    private final String uploadDir = "C:/Users/mohda/IdeaProjects/Myntra_Frontend/public/images/";
     private final ProductImageMapper productImageMapper;
-
-    @Value("${files.image}")
-    private String uploadDir;
 
     @Autowired
     public ProductImageServiceImpl(ProductImageRepository productImageRepository, ProductRepository productRepository, FileServiceImplementation fileService, ProductImageMapper productImageMapper) {
