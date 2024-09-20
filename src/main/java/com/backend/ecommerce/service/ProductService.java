@@ -26,4 +26,9 @@ public interface ProductService {
     ProductResponse getAllProductWithPagination(Integer pageNo, Integer pageSize);
 
     ProductResponse getProductWithPaginationAndSorting(Integer pageNo, Integer pageSize, String sortBy, String sortOrder);
+
+    ProductResponse searchProducts(String query, Integer pageNumber, Integer pageSize, String sortBy, String sortOrder);
+
+    List<Product> searchProducts(String query);
+
 }

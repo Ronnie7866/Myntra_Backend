@@ -1,9 +1,13 @@
 package com.backend.ecommerce.mapper;
 
+import com.backend.ecommerce.entity.Color;
+import com.backend.ecommerce.entity.Size;
 import com.backend.ecommerce.records.ProductDTO;
 import com.backend.ecommerce.entity.Product;
 import com.backend.ecommerce.entity.Category;
 import com.backend.ecommerce.repository.CategoryRepository;
+import com.backend.ecommerce.repository.ColorRepository;
+import com.backend.ecommerce.repository.SizeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -14,10 +18,14 @@ import java.util.stream.Collectors;
 public class ProductMapper implements EntityDTOMapper<Product, ProductDTO> {
 
     private final CategoryRepository categoryRepository;
+    private final SizeRepository sizeRepository;
+    private final ColorRepository colorRepository;
 
     @Autowired
-    public ProductMapper(CategoryRepository categoryRepository) {
+    public ProductMapper(CategoryRepository categoryRepository, SizeRepository sizeRepository, ColorRepository colorRepository) {
         this.categoryRepository = categoryRepository;
+        this.sizeRepository = sizeRepository;
+        this.colorRepository = colorRepository;
     }
 
     @Override
@@ -25,6 +33,14 @@ public class ProductMapper implements EntityDTOMapper<Product, ProductDTO> {
         List<Long> categoryIds = product.getCategories().stream()
                 .map(Category::getId)
                 .collect(Collectors.toList());
+
+        List<String> sizes = product.getSizes().stream()
+                .map(Size::getName)
+                .toList();
+
+        List<String> colors = product.getColors().stream()
+                .map(Color::getName)
+                .toList();
 
         return new ProductDTO(
                 product.getId(),
@@ -40,6 +56,8 @@ public class ProductMapper implements EntityDTOMapper<Product, ProductDTO> {
                 product.getDateUpdated(),
                 product.getRating(),
                 product.getAvailability(),
+                sizes,
+                colors,
                 categoryIds,
                 product.getProductImages()
         );
@@ -52,6 +70,18 @@ public class ProductMapper implements EntityDTOMapper<Product, ProductDTO> {
                 .map(categoryId -> categoryRepository.findById(categoryId)
                         .orElseThrow(() -> new RuntimeException("Category not found: " + categoryId)))
                 .collect(Collectors.toList());
+
+        // Convert size names to Size entities
+        List<Size> sizes = dto.sizes().stream()
+                .map(sizeName -> sizeRepository.findByName(sizeName)
+                        .orElseThrow(() -> new RuntimeException("Size not found: " + sizeName)))
+                .toList();
+
+        // Convert color names to Color entities
+        List<Color> colors = dto.colors().stream()
+                .map(colorName -> colorRepository.findByName(colorName)
+                        .orElseThrow(() -> new RuntimeException("Color not found: " + colorName)))
+                .toList();
 
         // Create a new Product entity and set the fields from the DTO
         Product product = new Product();
@@ -69,6 +99,8 @@ public class ProductMapper implements EntityDTOMapper<Product, ProductDTO> {
         product.setRating(dto.rating());
         product.setAvailability(dto.availability());
         product.setCategories(categories); // Set the fetched categories
+        product.setSizes(sizes);
+        product.setColors(colors);
         product.setProductImages(dto.productImages());
 
         return product;

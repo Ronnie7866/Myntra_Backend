@@ -1,7 +1,9 @@
 package com.backend.ecommerce.records;
 
+import com.backend.ecommerce.entity.Color;
 import com.backend.ecommerce.entity.ProductImageTable;
 import com.backend.ecommerce.entity.Rating;
+import com.backend.ecommerce.entity.Size;
 import com.backend.ecommerce.enums.AvailabilityStatus;
 
 import java.math.BigDecimal;
@@ -22,6 +24,8 @@ public record ProductDTO(
         LocalDateTime dateUpdated,
         List<Rating> rating,
         AvailabilityStatus availability,
+        List<String> sizes,
+        List<String> colors,
         List<Long> categoryIds,
         List<ProductImageTable> productImages
 ) {}

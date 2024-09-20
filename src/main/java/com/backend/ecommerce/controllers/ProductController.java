@@ -98,4 +98,31 @@ public class ProductController {
                                                              @RequestParam(defaultValue = AppConstants.SORT_ORDER, required = false) String sortOrder) {
         return ResponseEntity.ok(productService.getProductWithPaginationAndSorting(pageNumber, pageSize, sortBy, sortOrder));
     }
+
+    @GetMapping("/search")
+    public ResponseEntity<ProductResponse> searchProducts(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "0") Integer pageNumber,
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @RequestParam(defaultValue = "name") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortOrder) {
+        System.out.println("Executing method");
+
+        // Log the input parameters
+        System.out.println("Query: " + query);
+        System.out.println("Page Number: " + pageNumber);
+        System.out.println("Page Size: " + pageSize);
+        System.out.println("Sort By: " + sortBy);
+        System.out.println("Sort Order: " + sortOrder);
+
+        ProductResponse response = productService.searchProducts(query, pageNumber, pageSize, sortBy, sortOrder);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/suggestions")
+    public ResponseEntity<List<Product>> getProductSuggestions(
+            @RequestParam String query) {
+        List<Product> suggestions = productService.searchProducts(query);
+        return ResponseEntity.ok(suggestions);
+    }
 }

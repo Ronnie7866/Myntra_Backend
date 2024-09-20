@@ -139,4 +139,30 @@ public class ProductServiceImplementation implements ProductService {
         List<Product> productList = productPage.getContent();
         return new ProductResponse(productList, pageNo, pageSize, productPage.getTotalElements(), productPage.getTotalPages(), productPage.isLast());
     }
+
+    @Override
+    public ProductResponse searchProducts(String query, Integer pageNumber, Integer pageSize, String sortBy, String sortOrder) {
+        // Create pageable object with sorting
+        Sort sort = Sort.by(Sort.Order.by(sortBy));
+        if (sortOrder.equalsIgnoreCase("desc")) {
+            sort = sort.descending();
+        }
+        PageRequest pageRequest = PageRequest.of(pageNumber, pageSize, sort);
+
+        // Perform search with pagination and sorting
+        Page<Product> products = productRepository.search(query, pageRequest);
+        return new ProductResponse(
+                products.getContent(), // List<Product>
+                products.getNumber(),  // Page number
+                products.getSize(),    // Page size
+                products.getTotalElements(), // Total number of products
+                products.getTotalPages(), // Total number of pages
+                products.isLast() // Is last page
+        );
+    }
+
+    @Override
+    public List<Product> searchProducts(String query) {
+        return productRepository.findByNameContainingIgnoreCase(query);
+    }
 }

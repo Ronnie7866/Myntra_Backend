@@ -77,8 +77,8 @@ public class S3ImageUploader implements ImageUploader {
 
         Date expirationDate = new Date();
         long time = expirationDate.getTime();
-        int hour = 2;
-        time = time + hour * 60 * 60 * 1000;
+        int hour = 120; // duration for image link to available, iss algo se imageurl is going to valid for only 7 days
+        time = time + (long) hour * 60 * 60 * 1000;
 
         expirationDate.setTime(time);
 
