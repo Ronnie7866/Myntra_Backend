@@ -86,18 +86,80 @@ public class UserServiceImplementation implements UserService {
         return userRepository.findAll().stream().map(customModelMapper::apply).toList();
     }
 
+//    @Override
+//    public UserDTO updateUser(Long userId, UserDTO userDTO) {
+//        // Check for duplicate email entries
+//        if (isDuplicate(userDTO)) {
+//            throw new DuplicateEntryException(userDTO.email());
+//        }
+//
+//        // Fetch existing user from the repository
+//        User existingUser = userRepository.findById(userId)
+//                .orElseThrow(() -> new UserNotFoundException("User not found with this id: " + userId));
+//
+//        // Map updated values from UserDTO to User entity
+//        User updatedValues = customModelMapper.reverse(userDTO);
+//
+//        // Copy properties from updatedValues to existingUser, excluding id and password
+//        BeanUtils.copyProperties(updatedValues, existingUser, "id", "password"); // This line copies properties from updatedValues (which contains the immutable list) to existingUser.
+//
+//        // Save the updated user and return the UserDTO representation
+//        return customModelMapper.apply(userRepository.save(existingUser));
+//
+//    }
+
+
+//    @Override
+//    public UserDTO updateUser(Long userId, UserDTO userDTO) {
+//        // Check for duplicate email entries
+//        if (isDuplicate(userDTO)) {
+//            throw new DuplicateEntryException(userDTO.email());
+//        }
+//
+//        // Fetch existing user from the repository
+//        User existingUser = userRepository.findById(userId)
+//                .orElseThrow(() -> new UserNotFoundException("User not found with this id: " + userId));
+//
+//        // Map updated values from UserDTO to User entity
+//        User updatedValues = customModelMapper.reverse(userDTO);
+//
+//        // Copy properties from updatedValues to existingUser, excluding id, password, and addressList
+//        BeanUtils.copyProperties(updatedValues, existingUser, "id", "password", "addressList");
+//
+//        // Update the address list manually
+//        existingUser.getAddressList().clear();
+//        existingUser.getAddressList().addAll(updatedValues.getAddressList());
+//
+//        // Save the updated user and return the UserDTO representation
+//        return customModelMapper.apply(userRepository.save(existingUser));
+//    }
+
+
     @Override
     public UserDTO updateUser(Long userId, UserDTO userDTO) {
+        // Check for duplicate email entries
         if (isDuplicate(userDTO)) {
             throw new DuplicateEntryException(userDTO.email());
         }
-        User existingUser = userRepository.findById(userId).orElseThrow(() -> new UserNotFoundException("User not found with this id : " + userId));
+
+        // Fetch existing user from the repository
+        User existingUser = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found with this id: " + userId));
+
+        // Map updated values from UserDTO to User entity
         User updatedValues = customModelMapper.reverse(userDTO);
 
-        BeanUtils.copyProperties(updatedValues, existingUser, "id", "password");
-        return customModelMapper.apply(userRepository.save(existingUser));
+        // Copy properties from updatedValues to existingUser, excluding id, password, addressList, and createdat
+        BeanUtils.copyProperties(updatedValues, existingUser, "id", "password", "addressList", "createdat");
 
+        // Update the address list manually
+        existingUser.getAddressList().clear();
+        existingUser.getAddressList().addAll(updatedValues.getAddressList());
+
+        // Save the updated user and return the UserDTO representation
+        return customModelMapper.apply(userRepository.save(existingUser));
     }
+
 
     public boolean verifyUser(Long userId, String firstName, String lastName, Long phoneNumber) {
         isCustomerExists(userId);

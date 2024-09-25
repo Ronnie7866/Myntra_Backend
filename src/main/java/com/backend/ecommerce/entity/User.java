@@ -46,7 +46,7 @@ public class User implements UserDetails {
     private LocalDateTime createdat;
 
     @UpdateTimestamp
-    @Column(name = "modifiedat", nullable = false)
+    @Column(name = "modifiedat")
     private LocalDateTime modifiedat;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)

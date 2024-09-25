@@ -11,7 +11,6 @@ public record UserDTO(Long id,
                       String email,
                       Role role,
                       Long defaultPhoneNumber,
-                      List<Address> addressList
-
+                      List<AddressDTO> addressList
 ) {
 }
