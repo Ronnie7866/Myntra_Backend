@@ -23,8 +23,10 @@ public class UserMapper implements EntityDTOMapper<User, UserDTO> {
 
     @Override
     public UserDTO apply(User user) {
-
-        List<AddressDTO> addressDTOS = user.getAddressList().stream().map(addressMapper::apply).toList();
+        List<AddressDTO> addressDTOS = new ArrayList<>();
+        if (user.getAddressList() != null) {
+            addressDTOS = user.getAddressList().stream().map(addressMapper::apply).toList();
+        }
 
         return new UserDTO(user.getId(), user.getFirstName(), user.getLastName(), user.getEmail(), user.getRole(), user.getDefaultPhoneNumber(), addressDTOS);
 
