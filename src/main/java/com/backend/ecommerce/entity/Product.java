@@ -1,6 +1,7 @@
 package com.backend.ecommerce.entity;
 
 import com.backend.ecommerce.enums.AvailabilityStatus;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -11,6 +12,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +34,9 @@ public class Product {
     private String returnPeriod;
     private Integer stockQuantity;
     private BigDecimal averageRating;
+    private BigDecimal discountedPercentage;
+    private BigDecimal currentPrice;
+    private LocalDate deliveryDate;
 
     @CreationTimestamp
     private LocalDateTime dateAdded;

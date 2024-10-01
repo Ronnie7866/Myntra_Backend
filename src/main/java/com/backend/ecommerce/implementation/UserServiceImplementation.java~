@@ -137,10 +137,10 @@ public class UserServiceImplementation implements UserService {
 
     @Override
     public UserDTO updateUser(Long userId, UserDTO userDTO) {
-//        // Check for duplicate email entries
-//        if (isDuplicate(userDTO)) {
-//            throw new DuplicateEntryException(userDTO.email());
-//        }
+        // Check for duplicate email entries
+        if (isDuplicate(userDTO)) {
+            throw new DuplicateEntryException(userDTO.email());
+        }
 
         // Fetch existing user from the repository
         User existingUser = userRepository.findById(userId)

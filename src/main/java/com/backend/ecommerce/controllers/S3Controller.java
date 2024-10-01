@@ -1,6 +1,5 @@
 package com.backend.ecommerce.controllers;
 
-import com.backend.ecommerce.implementation.S3ImageUploader;
 import com.backend.ecommerce.service.ImageUploader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

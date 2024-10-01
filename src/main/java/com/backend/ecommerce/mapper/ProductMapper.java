@@ -52,6 +52,9 @@ public class ProductMapper implements EntityDTOMapper<Product, ProductDTO> {
                 product.getReturnPeriod(),
                 product.getStockQuantity(),
                 product.getAverageRating(),
+                product.getDiscountedPercentage(),
+                product.getCurrentPrice(),
+                product.getDeliveryDate(),
                 product.getDateAdded(),
                 product.getDateUpdated(),
                 product.getRating(),
@@ -94,6 +97,9 @@ public class ProductMapper implements EntityDTOMapper<Product, ProductDTO> {
         product.setReturnPeriod(dto.returnPeriod());
         product.setStockQuantity(dto.stockQuantity());
         product.setAverageRating(dto.averageRating());
+        product.setDiscountedPercentage(dto.discountedPercentage());
+        product.setCurrentPrice(dto.currentPrice());
+        product.setDeliveryDate(dto.deliveryDate());
         product.setDateAdded(dto.dateAdded());
         product.setDateUpdated(dto.dateUpdated());
         product.setRating(dto.rating());
