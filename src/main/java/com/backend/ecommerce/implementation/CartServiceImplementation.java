@@ -82,48 +82,34 @@ public class CartServiceImplementation implements CartService {
 //    }
 
     @Override
-    public CartProducts addProductToCart(Long userId, Long productId, Integer quantity) {
+    public CartProducts addProductToCart(Long userId, Long productId, Integer newQuantity) {
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
         Product product = productRepository.findById(productId).orElseThrow(() -> new RuntimeException("Product not found"));
 
         Cart cart = user.getCart();
-        CartProducts cartProducts;
-
-        Optional<CartProducts> existingCartItemOpt = Optional.empty();
-
-        // Check if the cart exists
-        if (cart != null) {
-            existingCartItemOpt = cartProductsRepository.findByCartIdAndProductId(cart.getId(), productId);
-        } else {
-            // Create a new cart if it doesn't exist
+        if (cart == null) {
             cart = new Cart();
             cart.setUser(user);
         }
 
-        // If the product already exists in the cart, update the quantity
-        if (existingCartItemOpt.isPresent()) {
-            cartProducts = existingCartItemOpt.get();
-            int newQuantity = cartProducts.getQuantity() + quantity;
+        Optional<CartProducts> existingCartItem = cartProductsRepository.findByCartIdAndProductId(cart.getId(), productId);
+
+        CartProducts cartProducts;
+        if (existingCartItem.isPresent()) {
+            cartProducts = existingCartItem.get();
+            // Set the quantity to the new value, not add to it
             cartProducts.setQuantity(newQuantity);
         } else {
-            // If the product is not in the cart, create a new cart item
             cartProducts = new CartProducts();
             cartProducts.setCart(cart);
             cartProducts.setProduct(product);
-            cartProducts.setQuantity(quantity);
-        }
-
-        // Decrease stock
-        try {
-            inventoryService.decreaseStock(productId, quantity);
-        } catch (InsufficientStockException | InventoryNotFoundException e) {
-            throw new RuntimeException(e);
+            cartProducts.setQuantity(newQuantity);
         }
 
         return cartProductsRepository.save(cartProducts);
     }
 
-    @Override // TODO create controller for this
+    @Override
     public void removeProductFromCart(Long userId, Long productId, Integer quantity) {
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
         Cart cart = user.getCart();

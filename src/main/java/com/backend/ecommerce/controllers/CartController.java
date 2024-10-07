@@ -34,6 +34,20 @@ public class CartController {
         return ResponseEntity.ok(cartProducts);
     }
 
+    @PostMapping("/remove")
+    public ResponseEntity<String> removeProductFromCart(
+            @RequestParam Long userId,
+            @RequestParam Long productId,
+            @RequestParam Integer quantity
+    ) {
+        try {
+            cartService.removeProductFromCart(userId, productId, quantity);
+            return ResponseEntity.ok("Product removed from cart successfully");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @GetMapping("/{cartId}")
     public ResponseEntity<Cart> getCart(@PathVariable Long cartId){
         Cart cart = cartService.getCart(cartId);

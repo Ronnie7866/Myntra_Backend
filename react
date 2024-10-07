@@ -1,0 +1,5084 @@
+// File: eslint.config.js
+
+import js from '@eslint/js'
+import globals from 'globals'
+import react from 'eslint-plugin-react'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+
+export default [
+  { ignores: ['dist'] },
+  {
+    files: ['**/*.{js,jsx}'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        ecmaFeatures: { jsx: true },
+        sourceType: 'module',
+      },
+    },
+    settings: { react: { version: '18.3' } },
+    plugins: {
+      react,
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      ...react.configs.recommended.rules,
+      ...react.configs['jsx-runtime'].rules,
+      ...reactHooks.configs.recommended.rules,
+      'react/jsx-no-target-blank': 'off',
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true },
+      ],
+    },
+  },
+]
+
+
+// File: postcss.config.js
+
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+
+
+// File: AdminDashboard.jsx
+
+import React, { useState } from "react";
+import { FaUsers, FaShoppingCart, FaMoneyBillWave, FaChartBar, FaBell, FaSearch, FaCog, FaSignOutAlt, FaClipboardList, FaUserCog } from "react-icons/fa";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import ProductForm from "./ProductForm.jsx";
+import InventoryForm from "./InventoryForm.jsx";
+import CategoryForm from "./CategoryForm.jsx";
+
+const AdminDashboard = () => {
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeProductTab, setActiveProductTab] = useState("product");
+
+  const stats = [
+    { title: "Total Users", value: "10,283", icon: FaUsers, color: "bg-blue-500" },
+    { title: "Total Orders", value: "1,849", icon: FaShoppingCart, color: "bg-green-500" },
+    { title: "Total Revenue", value: "$45,290", icon: FaMoneyBillWave, color: "bg-yellow-500" },
+    { title: "Total Products", value: "1,423", icon: FaChartBar, color: "bg-purple-500" }
+  ];
+
+  const recentOrders = [
+    { id: "#12345", customer: "John Doe", date: "2023-06-01", status: "Completed", total: "$129.99" },
+    { id: "#12346", customer: "Jane Smith", date: "2023-06-02", status: "Processing", total: "$79.99" },
+    { id: "#12347", customer: "Bob Johnson", date: "2023-06-03", status: "Shipped", total: "$199.99" },
+    { id: "#12348", customer: "Alice Brown", date: "2023-06-04", status: "Pending", total: "$59.99" },
+    { id: "#12349", customer: "Charlie Wilson", date: "2023-06-05", status: "Completed", total: "$149.99" }
+  ];
+
+  const salesData = [
+    { name: "Jan", sales: 4000 },
+    { name: "Feb", sales: 3000 },
+    { name: "Mar", sales: 5000 },
+    { name: "Apr", sales: 4500 },
+    { name: "May", sales: 6000 },
+    { name: "Jun", sales: 5500 },
+  ];
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case "dashboard":
+        return (
+          <div>
+            <h2 className="text-3xl font-bold mb-6 text-gray-800">Dashboard Overview</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {stats.map((stat, index) => (
+                <div key={index} className={`${stat.color} text-white p-6 rounded-lg shadow-lg transform hover:scale-105 transition-transform duration-300`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{stat.title}</p>
+                      <p className="text-3xl font-bold mt-2">{stat.value}</p>
+                    </div>
+                    <stat.icon className="text-5xl opacity-50" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h3 className="text-xl font-bold mb-4 text-gray-800">Sales Overview</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={salesData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="sales" stroke="#8884d8" activeDot={{ r: 8 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h3 className="text-xl font-bold mb-4 text-gray-800">Recent Orders</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full table-auto">
+                    <thead>
+                    <tr className="bg-gray-100">
+                      <th className="px-4 py-2 text-left">Order ID</th>
+                      <th className="px-4 py-2 text-left">Customer</th>
+                      <th className="px-4 py-2 text-left">Date</th>
+                      <th className="px-4 py-2 text-left">Status</th>
+                      <th className="px-4 py-2 text-left">Total</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {recentOrders.map((order, index) => (
+                      <tr key={index} className="border-b hover:bg-gray-50">
+                        <td className="px-4 py-2 font-medium">{order.id}</td>
+                        <td className="px-4 py-2">{order.customer}</td>
+                        <td className="px-4 py-2">{order.date}</td>
+                        <td className="px-4 py-2">
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              order.status === "Completed" ? "bg-green-200 text-green-800" :
+                                order.status === "Processing" ? "bg-yellow-200 text-yellow-800" :
+                                  order.status === "Shipped" ? "bg-blue-200 text-blue-800" :
+                                    "bg-red-200 text-red-800"
+                            }`}>
+                              {order.status}
+                            </span>
+                        </td>
+                        <td className="px-4 py-2 font-medium">{order.total}</td>
+                      </tr>
+                    ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      case "products":
+        return (
+          <div>
+            <h2 className="text-3xl font-bold mb-6 text-gray-800">Products Management</h2>
+            <div className="mb-6">
+              <nav className="flex space-x-4">
+                <button
+                  className={`px-4 py-2 rounded-lg ${activeProductTab === "product" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-800"}`}
+                  onClick={() => setActiveProductTab("product")}
+                >
+                  Product Management
+                </button>
+                <button
+                  className={`px-4 py-2 rounded-lg ${activeProductTab === "inventory" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-800"}`}
+                  onClick={() => setActiveProductTab("inventory")}
+                >
+                  Inventory Management
+                </button>
+                <button
+                  className={`px-4 py-2 rounded-lg ${activeProductTab === "category" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-800"}`}
+                  onClick={() => setActiveProductTab("category")}
+                >
+                  Category Management
+                </button>
+              </nav>
+            </div>
+            <div>
+              {activeProductTab === "product" && <ProductForm />}
+              {activeProductTab === "inventory" && <InventoryForm />}
+              {activeProductTab === "category" && <CategoryForm />}
+            </div>
+          </div>
+        );
+      case "orders":
+        return <h2 className="text-3xl font-bold text-gray-800">Order Management</h2>;
+      case "customers":
+        return <h2 className="text-3xl font-bold text-gray-800">Customer Management</h2>;
+      case "inventory":
+        return <h2 className="text-3xl font-bold text-gray-800">Inventory Management</h2>;
+      case "settings":
+        return <h2 className="text-3xl font-bold text-gray-800">Settings</h2>;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="flex h-screen bg-gray-100">
+      {/* Sidebar */}
+      <div className="w-64 bg-gradient-to-b from-blue-800 to-blue-600 text-white shadow-xl">
+        <div className="p-6">
+          <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+        </div>
+        <nav className="mt-6">
+          {[
+            { name: "dashboard", icon: FaChartBar },
+            { name: "products", icon: FaShoppingCart },
+            { name: "orders", icon: FaMoneyBillWave },
+            { name: "customers", icon: FaUsers },
+            { name: "inventory", icon: FaClipboardList },
+            { name: "settings", icon: FaUserCog }
+          ].map(({ name, icon: Icon }) => (
+            <a
+              key={name}
+              href="#"
+              className={`flex items-center py-3 px-6 ${activeTab === name ? "bg-blue-700" : "hover:bg-blue-700"} transition-colors duration-200`}
+              onClick={() => setActiveTab(name)}
+            >
+              <Icon className="mr-3" />
+              {name.charAt(0).toUpperCase() + name.slice(1)}
+            </a>
+          ))}
+        </nav>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top Bar */}
+        <header className="bg-white shadow-md z-10">
+          <div className="flex items-center justify-between p-4">
+            <div className="flex items-center">
+              <input
+                type="text"
+                placeholder="Search..."
+                className="px-4 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+              />
+              <button className="ml-2 p-2 text-gray-500 hover:text-gray-700 focus:outline-none">
+                <FaSearch />
+              </button>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button className="p-2 text-gray-500 hover:text-gray-700 focus:outline-none relative">
+                <FaBell />
+                <span className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">3</span>
+              </button>
+              <button className="p-2 text-gray-500 hover:text-gray-700 focus:outline-none">
+                <FaCog />
+              </button>
+              <button className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-full focus:outline-none transition-colors duration-200">
+                <FaSignOutAlt className="mr-2 inline-block" />
+                Logout
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Content */}
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100">
+          <div className="container mx-auto px-6 py-8">{renderContent()}</div>
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default AdminDashboard;
+
+
+// File: AdminDashboard.module.css
+
+.dashboardContainer {
+    display: flex;
+    flex-direction: column;
+}
+
+.nav {
+    background-color: #f8f9fa;
+    padding: 20px;
+}
+
+.navList {
+    display: flex;
+    list-style-type: none;
+    padding: 0;
+    justify-content: space-evenly;
+}
+
+.navList li {
+    padding: 10px 20px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-right: 15px;
+    border-bottom: 2px solid transparent;
+    transition: border-color 0.3s ease;
+}
+
+.navList li:hover {
+    border-bottom: 2px solid #007bff;
+}
+
+.active {
+    border-bottom: 2px solid #007bff;
+    color: #007bff;
+}
+
+.content {
+    flex-grow: 1;
+    padding: 20px;
+}
+
+
+// File: CategoryForm.jsx
+
+import React, { useState } from "react";
+import styles from "./CategoryForm.module.css";
+import axiosInstance from "../../utils/api.js";
+
+const CategoryForm = () => {
+  const [categoryData, setCategoryData] = useState({
+    name: "",
+    description: "",
+  });
+
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setCategoryData({ ...categoryData, [name]: value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const response = await axiosInstance.post("/api/category", categoryData);
+      setSuccessMessage("Category saved successfully!");
+    } catch (error) {
+      setErrorMessage("An error occurred. Please try again.");
+      console.error("Error saving category:", error);
+    }
+  };
+
+  return (
+    <div className={styles.categoryContainer}>
+      <h2 className={styles.title}>Add or Update Category</h2>
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.formGroup}>
+          <label htmlFor="name" className={styles.label}>
+            Name
+          </label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            value={categoryData.name}
+            onChange={handleChange}
+            className={styles.input}
+            required
+          />
+        </div>
+        <div className={styles.formGroup}>
+          <label htmlFor="description" className={styles.label}>
+            Description
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            value={categoryData.description}
+            onChange={handleChange}
+            className={styles.input}
+            required
+          />
+        </div>
+
+        <button type="submit" className={styles.submitButton}>
+          Submit
+        </button>
+
+        {errorMessage && <p className={styles.error}>{errorMessage}</p>}
+        {successMessage && <p className={styles.success}>{successMessage}</p>}
+      </form>
+    </div>
+  );
+};
+
+export default CategoryForm;
+
+
+// File: CategoryForm.module.css
+
+/* src/components/CategoryForm.module.css */
+.categoryContainer {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 40px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    animation: fadeIn 0.8s ease-in-out;
+    margin-top: 80px;
+}
+
+.title {
+    font-size: 28px;
+    text-align: center;
+    margin-bottom: 20px;
+    color: #333;
+    animation: bounceIn 1s;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+}
+
+.formGroup {
+    margin-bottom: 20px;
+}
+
+.label {
+    font-size: 16px;
+    margin-bottom: 8px;
+    display: block;
+    color: #333;
+}
+
+.input {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    transition: border-color 0.3s ease;
+}
+
+.input:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.submitButton {
+    padding: 12px;
+    font-size: 16px;
+    color: #fff;
+    background-color: #007bff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    animation: pulse 1s infinite;
+}
+
+.submitButton:hover {
+    background-color: #d63049;
+}
+
+.error {
+    color: #dc3545;
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+.success {
+    color: #28a745;
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+/* Keyframes for animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes bounceIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.3);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+
+// File: ImageUploadForm.jsx
+
+import React, { useState } from "react";
+import styles from "./ImageUploadForm.module.css";
+import axiosInstance from "../../utils/api.js";
+import {useNavigate, useParams} from "react-router-dom";
+import {showErrorToast, showSuccessToast} from "../../utils/toastify.js";
+
+const ImageUploadForm = () => {
+  const [file, setFile] = useState(null);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  const navigate = useNavigate();
+  const { id } = useParams(); // extract the productId form the url
+
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!file) {
+      setError("Please choose a file before submitting.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("productId", id);
+
+    try {
+      await axiosInstance.post("/api/s3", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      setSuccess("Image uploaded successfully!");
+      showSuccessToast("Image upload successfully!");
+      setError(null);
+      setFile(null); // Reset the file input
+      navigate(`/product-form`);
+    } catch (err) {
+      setError("Failed to upload the image. Please try again.");
+      setSuccess(null);
+      showErrorToast("An error occurred while uploading image", err);
+    }
+  };
+
+  return (
+    <div className={styles.formContainer}>
+      <h2 className={styles.title}>Upload Product Image</h2>
+      <form className={styles.form} onSubmit={handleSubmit}>
+        {/* File Input */}
+        <div className={styles.formGroup}>
+          <label className={styles.label}>Select Image</label>
+          <input
+            type="file"
+            name="file"
+            accept="image/*"
+            className={styles.input}
+            onChange={handleFileChange}
+            required
+          />
+        </div>
+
+        {/* Submit Button */}
+        <button type="submit" className={styles.submitButton}>
+          Upload Image
+        </button>
+
+        {/* Error and Success Messages */}
+        {error && <div className={styles.error}>{error}</div>}
+        {success && <div className={styles.success}>{success}</div>}
+      </form>
+    </div>
+  );
+};
+
+export default ImageUploadForm;
+
+
+// File: ImageUploadForm.module.css
+
+.formContainer {
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.title {
+    text-align: center;
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+}
+
+.formGroup {
+    margin-bottom: 15px;
+}
+
+.label {
+    margin-bottom: 5px;
+    font-size: 1rem;
+    color: #555;
+}
+
+.input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    font-size: 1rem;
+}
+
+.submitButton {
+    padding: 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease;
+}
+
+.submitButton:hover {
+    background-color: #0056b3;
+}
+
+.error {
+    color: red;
+    margin-top: 10px;
+}
+
+.success {
+    color: green;
+    margin-top: 10px;
+}
+
+
+// File: InventoryForm.jsx
+
+import React, { useState, useEffect } from "react";
+import styles from "./InventoryForm.module.css";
+import axiosInstance from "../../utils/api.js"; // Assuming you're using CSS modules
+
+const InventoryForm = () => {
+  const [formData, setFormData] = useState({
+    productId: "", // getting this in long
+    quantity: "", // getting this in int from backend
+  });
+
+  const [products, setProducts] = useState([]); // To store available products
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+
+  // Fetch products for the dropdown list
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await axiosInstance.get("/api/products"); // Fetch products
+        setProducts(response.data);
+      } catch (err) {
+        console.error("Error fetching products:", err);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    // Convert productId and quantity to numbers
+    const { productId, quantity } = formData;
+    try {
+      await axiosInstance.post(
+        `/api/inventory/${Number(productId)}?stock=${Number(quantity)}`
+      ); // Send inventory data to backend
+      setSuccess("Inventory updated successfully!");
+      setError(null);
+      setFormData({
+        productId: "",
+        quantity: "",
+      });
+    } catch (err) {
+      setError("Failed to update inventory. Please try again.");
+      setSuccess(null);
+    }
+  };
+
+  return (
+    <div className={styles.formContainer}>
+      <h2 className={styles.title}>Update Inventory</h2>
+      <form className={styles.form} onSubmit={handleSubmit}>
+        {/* Product Dropdown */}
+        <div className={styles.formGroup}>
+          <label className={styles.label}>Product</label>
+          <select
+            name="productId"
+            className={styles.input}
+            value={formData.productId}
+            onChange={handleChange}
+            required
+          >
+            <option value="">Select Product</option>
+            {products.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Quantity Field */}
+        <div className={styles.formGroup}>
+          <label className={styles.label}>Quantity</label>
+          <input
+            type="number"
+            name="quantity"
+            className={styles.input}
+            value={formData.quantity}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        {/* Submit Button */}
+        <button type="submit" className={styles.submitButton}>
+          Update Inventory
+        </button>
+
+        {/* Error and Success Messages */}
+        {error && <div className={styles.error}>{error}</div>}
+        {success && <div className={styles.success}>{success}</div>}
+      </form>
+    </div>
+  );
+};
+
+export default InventoryForm;
+
+
+// File: InventoryForm.module.css
+
+.formContainer {
+    max-width: 500px;
+    background-color: #f9f9f9;
+    padding: 20px 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    animation: fadeIn 0.5s ease-in-out;
+    margin: 80px auto 40px;
+}
+
+@keyframes fadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.title {
+    text-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.title::after {
+    content: '';
+    width: 50px;
+    height: 4px;
+    background-color: #ff3f6c;
+    display: block;
+    margin: 8px auto 0;
+    border-radius: 2px;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+}
+
+.formGroup {
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 8px;
+    display: block;
+    transition: all 0.3s ease;
+}
+
+.input {
+    width: 100%;
+    padding: 10px 15px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    outline: none;
+    transition: border-color 0.3s ease;
+    background-color: #fff;
+}
+
+.input:focus {
+    border-color: #ff3f6c;
+    background-color: #fff5f5;
+}
+
+.input:hover {
+    border-color: #ff3f6c;
+}
+
+.select {
+    width: 100%;
+    padding: 10px 15px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    outline: none;
+    transition: border-color 0.3s ease;
+    background-color: #fff;
+}
+
+.select:focus {
+    border-color: #ff3f6c;
+    background-color: #fff5f5;
+}
+
+.submitButton {
+    background-color: #ff3f6c;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+.submitButton:hover {
+    background-color: #d63049;
+    transform: translateY(-2px);
+}
+
+.submitButton:active {
+    background-color: #d63049;
+}
+
+.success {
+    color: #28a745;
+    font-size: 14px;
+    margin-top: 10px;
+    text-align: center;
+}
+
+.error {
+    color: #dc3545;
+    font-size: 14px;
+    margin-top: 10px;
+    text-align: center;
+}
+
+@media (max-width: 600px) {
+    .formContainer {
+        padding: 15px 20px;
+    }
+}
+
+
+// File: ProductForm.jsx
+
+import React, { useEffect, useState } from "react";
+import styles from "./ProductForm.module.css";
+import axiosInstance from "../../utils/api.js";
+import { useNavigate } from "react-router-dom";
+import { showErrorToast, showSuccessToast } from "../../utils/toastify.js";
+
+const ProductForm = () => {
+  const [formData, setFormData] = useState({
+    name: "",
+    price: "",
+    discountedPercentage: "",
+    currentPrice: "",
+    returnPeriod: "",
+    description: "",
+    stockQuantity: "",
+    averageRating: "",
+    availability: "",
+    categoryId: "",
+    size: "",
+    color: "",
+    deliveryDate: "",
+    brand: "", // New field for brand
+  });
+
+  const [categories, setCategories] = useState([]);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await axiosInstance.get("/api/category");
+        setCategories(response.data);
+      } catch (err) {
+        setError("Failed to fetch categories.");
+        console.log("Error Occurred: ", err);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    // Update formData state
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }));
+
+    // Calculate current price if price or discounted percentage changes
+    if (name === "price" || name === "discountedPercentage") {
+      const price = parseFloat(value) || 0; // Use the current value instead of prevData
+      const discount = parseFloat(formData.discountedPercentage) || 0;
+
+      // If price or discount percentage is updated, calculate the current price
+      if (name === "price") {
+        const discountedPrice = price - (price * discount) / 100;
+        setFormData((prevData) => ({
+          ...prevData,
+          currentPrice: discountedPrice.toFixed(2),
+        }));
+      } else if (name === "discountedPercentage") {
+        const discountedPrice = parseFloat(formData.price) - (parseFloat(formData.price) * value) / 100;
+        setFormData((prevData) => ({
+          ...prevData,
+          currentPrice: discountedPrice.toFixed(2),
+        }));
+      }
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await axiosInstance.post("/api/products", formData);
+      setSuccess("Product added successfully!");
+      setError(null);
+      setFormData({
+        name: "",
+        price: "",
+        discountedPercentage: "",
+        currentPrice: "",
+        returnPeriod: "",
+        description: "",
+        stockQuantity: "",
+        averageRating: "",
+        availability: "",
+        categoryId: "",
+        size: "",
+        color: "",
+        deliveryDate: "",
+        brand: "", // Reset brand field
+      });
+      const productId = response.data.id;
+      navigate(`/upload-image/${productId}`);
+      showSuccessToast("Product Uploaded successfully!");
+    } catch (err) {
+      setError("Failed to add product. Please try again.");
+      setSuccess(null);
+      showErrorToast("An error occurred!", err);
+    }
+  };
+
+  return (
+      <div className={styles.formContainer}>
+        <h2 className={styles.title}>Add Product</h2>
+        <form className={styles.form} onSubmit={handleSubmit}>
+          {/* Name Field */}
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Name</label>
+            <input
+                type="text"
+                name="name"
+                className={styles.input}
+                value={formData.name}
+                onChange={handleChange}
+                required
+            />
+          </div>
+
+          {/* Price Field */}
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Price</label>
+            <input
+                type="text"
+                name="price"
+                className={styles.input}
+                value={formData.price}
+                onChange={handleChange}
+                required
+            />
+          </div>
+
+          {/* Discounted Percentage Field */}
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Discounted Percentage (%)</label>
+            <input
+                type="number"
+                name="discountedPercentage"
+                className={styles.input}
+                value={formData.discountedPercentage}
+                onChange={handleChange}
+                min="0"
+                max="100"
+            />
+          </div>
+
+          {/* Current Price Field */}
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Current Price</label>
+            <input
+                type="text"
+                name="currentPrice"
+                className={styles.input}
+                value={formData.currentPrice}
+                readOnly
+            />
+          </div>
+
+          {/* Brand Field */}
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Brand</label>
+            <input
+                type="text"
+                name="brand"
+                className={styles.input}
+                value={formData.brand}
+                onChange={handleChange}
+                required
+            />
+          </div>
+
+          {/* Return Period Field */}
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Return Period</label>
+            <input
+                type="text"
+                name="returnPeriod"
+                className={styles.input}
+                value={formData.returnPeriod}
+                onChange={handleChange}
+                required
+            />
+          </div>
+
+          {/* Description Field */}
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Description</label>
+            <textarea
+                name="description"
+                className={styles.input}
+                value={formData.description}
+                onChange={handleChange}
+                required
+            />
+          </div>
+
+          {/* Stock Quantity Field */}
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Stock Quantity</label>
+            <input
+                type="number"
+                name="stockQuantity"
+                className={styles.input}
+                value={formData.stockQuantity}
+                onChange={handleChange}
+                required
+            />
+          </div>
+
+          {/* Average Rating Field */}
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Average Rating</label>
+            <input
+                type="number"
+                name="averageRating"
+                className={styles.input}
+                value={formData.averageRating}
+                onChange={handleChange}
+                step="0.1"
+                min="0"
+                max="5"
+                required
+            />
+          </div>
+
+          {/* Availability Field */}
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Availability</label>
+            <select
+                name="availability"
+                className={styles.input}
+                value={formData.availability}
+                onChange={handleChange}
+                required
+            >
+              <option value="">Select Availability</option>
+              <option value="AVAILABLE">In Stock</option>
+              <option value="UNAVAILABLE">Out of Stock</option>
+            </select>
+          </div>
+
+          {/* Category Dropdown */}
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Category</label>
+            <select
+                name="categoryId"
+                className={styles.input}
+                value={formData.categoryId}
+                onChange={handleChange}
+                required
+            >
+              <option value="">Select Category</option>
+              {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Delivery Date Field */}
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Delivery Date</label>
+            <input
+                type="date"
+                name="deliveryDate"
+                className={styles.input}
+                value={formData.deliveryDate}
+                onChange={handleChange}
+                required
+            />
+          </div>
+
+          {/* Submit Button */}
+          <button type="submit" className={styles.submitButton}>
+            Add Product
+          </button>
+
+          {/* Error and Success Messages */}
+          {error && <div className={styles.error}>{error}</div>}
+          {success && <div className={styles.success}>{success}</div>}
+        </form>
+      </div>
+  );
+};
+
+export default ProductForm;
+
+
+// File: ProductForm.module.css
+
+
+.formContainer {
+    background-color: #ffffff;
+    padding: 40px;
+    max-width: 600px;
+    margin: auto;
+    box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+.title {
+    text-align: center;
+    font-size: 2rem;
+    font-weight: bold;
+    color: #333333;
+    margin-bottom: 20px;
+    animation: slideIn 0.8s ease-in-out;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+}
+
+.formGroup {
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.label {
+    font-size: 1rem;
+    color: #666666;
+    margin-bottom: 10px;
+    display: inline-block;
+    transition: color 0.3s;
+}
+
+.input,
+textarea,
+select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #dddddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    color: #333333;
+    outline: none;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.input:focus,
+textarea:focus,
+select:focus {
+    border-color: #ff3f6c;
+    box-shadow: 0 0 5px rgba(255, 63, 108, 0.5);
+}
+
+textarea {
+    min-height: 100px;
+}
+
+.submitButton {
+    background-color: #ff3f6c;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 15px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.submitButton:hover {
+    background-color: #ff577d;
+}
+
+.error, .success {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 1rem;
+    color: #ffffff;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.error {
+    color: black;
+}
+
+.success {
+    background-color: #4caf50;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+
+// File: LoginForm.jsx
+
+import React, { useEffect, useRef, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { loginUser } from "../../store/slices/authSlice.js";
+import styles from "./LoginForm.module.css";
+import { Link, useNavigate } from "react-router-dom";
+
+const LoginForm = () => {
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const hasNavigated = useRef(false);
+
+  const { isLoading, error, successMessage, user, isAuthenticated } =
+    useSelector((state) => state.auth);
+
+  useEffect(() => {
+    if (isAuthenticated && !hasNavigated.current) {
+      if (user.role === "ADMIN") {
+        navigate("/admin-dashboard");
+      } else if (user.role === "USER") {
+        navigate("/");
+      }
+      hasNavigated.current = true;
+    }
+  }, [isAuthenticated, user, navigate]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    dispatch(loginUser(formData));
+  };
+
+  return (
+    <div className={styles.loginContainer}>
+      <h2 className={styles.title}>Login to Your Account</h2>
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.formGroup}>
+          <label htmlFor="email" className={styles.label}>
+            Email
+          </label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            className={styles.input}
+            required
+          />
+        </div>
+
+        <div className={styles.formGroup}>
+          <label htmlFor="password" className={styles.label}>
+            Password
+          </label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            className={styles.input}
+            required
+          />
+        </div>
+
+        <button
+          type="submit"
+          className={styles.submitButton}
+          disabled={isLoading}
+        >
+          {isLoading ? "Logging in..." : "Login"}
+        </button>
+
+        {error && <p className={styles.error}>{error}</p>}
+        {successMessage && <p className={styles.success}>{successMessage}</p>}
+      </form>
+      <div className={styles.createAccountSection}>
+        <p>Don't have an account</p>
+        <Link to="/signup">Create New Account</Link>
+      </div>
+    </div>
+  );
+};
+
+export default LoginForm;
+
+
+// File: LoginForm.module.css
+
+.loginContainer {
+    max-width: 400px;
+    padding: 40px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    animation: fadeIn 0.8s ease-in-out;
+    margin: 10px auto;
+}
+
+.title {
+    font-size: 24px;
+    text-align: center;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+}
+
+.formGroup {
+    margin-bottom: 15px;
+}
+
+.label {
+    font-size: 14px;
+    margin-bottom: 5px;
+    color: #555;
+}
+
+.input {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: 100%;
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+}
+
+.input:focus {
+    border-color: #f57224;
+    box-shadow: 0 0 8px rgba(245, 114, 36, 0.2);
+}
+
+.submitButton {
+    padding: 10px;
+    background-color: #f57224;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.submitButton:hover {
+    background-color: #e25d1a;
+    transform: scale(1.05);
+}
+
+.submitButton:active {
+    background-color: #c94b17;
+}
+
+.error {
+    color: red;
+    font-size: 14px;
+    margin-top: 10px;
+    text-align: center;
+}
+
+.success {
+    color: green;
+    font-size: 14px;
+    margin-top: 10px;
+    text-align: center;
+}
+
+/* Fade-in animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.createAccountSection {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.createAccountSection p {
+    margin-bottom: 10px;
+    font-size: 14px;
+    color: #333;
+}
+
+.createAccountSection a {
+    color: #ff3f6c;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.createAccountSection a:hover {
+    text-decoration: underline;
+}
+
+
+// File: Signup.jsx
+
+import React, { useState } from "react";
+import styles from "./Signup.module.css";
+import axios from "axios";
+import { FcGoogle } from "react-icons/fc";
+import { FaGithub } from "react-icons/fa";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css"; // Import Toastify CSS
+import { useNavigate } from "react-router-dom";
+import { showSuccessToast, showErrorToast } from "../../utils/toastify.js";
+
+const Signup = () => {
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+  });
+
+  const [loading, setLoading] = useState(false); // State for spinner
+  const navigate = useNavigate();
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleGoogleLogin = () => {
+    window.location.href = "http://localhost:8080/oauth2/authorization/google";
+  };
+
+  const handleGithubLogin = () => {
+    window.location.href = "http://localhost:8080/oauth2/authorization/github";
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    setLoading(true); // Start loading when the form is submitted
+
+    try {
+      const response = await axios.post(
+        "http://localhost:8080/api/auth/register",
+        formData,
+        {
+          "Content-Type": "application/json",
+        }
+      );
+
+      // Save the token in local storage
+      localStorage.setItem("token", response.data.token);
+
+      // Display success toast
+      showSuccessToast("Registration successful!");
+      navigate("/");
+    } catch (error) {
+      // Check if error response exists
+      if (error.response) {
+        if (error.response.status === 409) {
+          // Handle duplicate entry error
+          showErrorToast("User already registered! Please log in.");
+        } else if (error.response.status === 500) {
+          // Handle internal server error
+          const errorMessage =
+            error.response.data.detail ||
+            "An error occurred. Please try again.";
+          showErrorToast(errorMessage);
+        } else {
+          // Handle other errors
+          showErrorToast("Registration failed! Please try again.");
+        }
+      } else {
+        // Handle network or other unexpected errors
+        showErrorToast("An unexpected error occurred. Please try again.");
+      }
+    } finally {
+      setLoading(false); // Stop loading
+    }
+  };
+
+  return (
+    <div className={styles.formContainer}>
+      <h2 className={styles.formTitle}>Create an Account</h2>
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.formGroup}>
+          <label htmlFor="firstName" className={styles.label}>
+            First Name
+          </label>
+          <input
+            type="text"
+            id="firstName"
+            name="firstName"
+            value={formData.firstName}
+            onChange={handleChange}
+            className={styles.input}
+            required
+          />
+        </div>
+
+        <div className={styles.formGroup}>
+          <label htmlFor="lastName" className={styles.label}>
+            Last Name
+          </label>
+          <input
+            type="text"
+            id="lastName"
+            name="lastName"
+            value={formData.lastName}
+            onChange={handleChange}
+            className={styles.input}
+            required
+          />
+        </div>
+
+        <div className={styles.formGroup}>
+          <label htmlFor="email" className={styles.label}>
+            Email
+          </label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            className={styles.input}
+            required
+          />
+        </div>
+
+        <div className={styles.formGroup}>
+          <label htmlFor="password" className={styles.label}>
+            Password
+          </label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            className={styles.input}
+            required
+          />
+        </div>
+
+        <button
+          type="submit"
+          className={styles.submitButton}
+          disabled={loading}
+        >
+          {loading ? "Submitting..." : "Register"}
+        </button>
+      </form>
+      <div className={styles.OAuthButtonContainer}>
+        <button
+          className={`${styles.button} ${styles.googleButton}`}
+          onClick={handleGoogleLogin}
+          disabled={loading}
+        >
+          <FcGoogle />
+          Login with Google
+        </button>
+        <button
+          className={`${styles.button} ${styles.githubButton}`}
+          onClick={handleGithubLogin}
+          disabled={loading}
+        >
+          <FaGithub />
+          Login with Github
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default Signup;
+
+
+// File: Signup.module.css
+
+/* Main container for the form */
+.formContainer {
+    max-width: 500px;
+    padding: 40px;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    animation: fadeIn 0.8s ease-in-out;
+    font-family: 'Roboto', sans-serif;
+    margin: 0px auto 50px;
+}
+
+/* Form Title Styling */
+.formTitle {
+    font-size: 24px;
+    font-weight: 600;
+    color: #ff3f6c; /* Myntra brand color */
+    margin-bottom: 20px;
+    text-transform: uppercase;
+}
+
+/* Form structure */
+.form {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Form group structure */
+.formGroup {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+
+/* Label styling */
+.label {
+    font-size: 14px;
+    margin-bottom: 8px;
+    color: #333;
+    font-weight: 500;
+    text-transform: capitalize;
+}
+
+/* Input styling with animated border */
+.input {
+    padding: 12px;
+    font-size: 16px;
+    border-radius: 8px;
+    border: 2px solid #ddd;
+    transition: border 0.3s ease;
+    font-family: inherit;
+}
+
+/* Input animation on focus */
+.input:focus {
+    border-color: #ff3f6c;
+    box-shadow: 0 0 10px rgba(255, 63, 108, 0.2);
+    outline: none;
+}
+
+/* Submit button */
+.submitButton {
+    width: 100%;
+    padding: 15px;
+    background-color: #ff3f6c;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    text-transform: uppercase;
+}
+
+/* Button hover animation */
+.submitButton:hover {
+    background-color: #ff1f56;
+    transform: scale(1.05);
+}
+
+/* Fade-in animation for the form container */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 600px) {
+    .formContainer {
+        padding: 20px;
+    }
+
+    .input {
+        font-size: 14px;
+    }
+
+    .submitButton {
+        padding: 12px;
+        font-size: 16px;
+    }
+}
+
+
+/* Define the base styles for the buttons */
+.button {
+    background-color: #4285F4; /* Google Blue */
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.3s ease;
+    margin: 5px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Add a gradient overlay effect on hover */
+.button:hover {
+    background-color: #357ae8;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.button:focus {
+    outline: 2px solid #357ae8;
+    outline-offset: 2px;
+}
+
+/* Add a pulse animation on click */
+.button:active {
+    background-color: #2a56c6;
+    transform: scale(0.98);
+}
+
+/* Add a ripple effect on click */
+.button:after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 300%;
+    height: 300%;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.4s, height 0.4s;
+    pointer-events: none;
+}
+
+.button:active:after {
+    width: 0;
+    height: 0;
+    transition: 0s;
+}
+
+/* Specific styles for the Google button */
+.googleButton {
+    background-color: #4285F4;
+}
+
+/* Specific styles for the GitHub button */
+.githubButton {
+    background-color: #333;
+}
+
+/* Add a hover effect for GitHub button */
+.githubButton:hover {
+    background-color: #444;
+}
+
+.OAuthButtonContainer {
+    margin-top: 1.5rem;
+    /*display: flex;*/
+    /*gap: 1rem;*/
+    /*justify-content: center;*/
+}
+
+.button svg {
+    margin-right: 0.5rem;
+}
+
+.spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-left-color: #4caf50;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 20px auto;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+
+
+// File: BagItem.jsx
+
+import React from 'react';
+import { RiDeleteBinFill } from "react-icons/ri";
+import { removeFromBag, updateQuantity } from "../../store/slices/bagSlice.js";
+import { useEffect } from "react";
+import { fetchProductImage } from "../../store/slices/imageSlice.js";
+import styles from "./BagItem.module.css";
+import { useDispatch, useSelector } from "react-redux";
+
+export default function BagItem({ item, cartProductId, quantity }) {
+  const dispatch = useDispatch();
+  const imageURL = useSelector((store) => store.images[item.id]);
+  const user = useSelector((state) => state.auth);
+  const userId = user?.user?.id || 1; // Use 1 as default if user id is not available
+
+  const handleRemoveItem = () => {
+    dispatch(removeFromBag({ userId, productId: item.id, quantity }));
+  };
+
+  const handleIncreaseQuantity = () => {
+    dispatch(updateQuantity({ userId, productId: item.id, quantity: quantity + 1 }));
+  }
+
+  const handleDecreaseQuantity = () => {
+    if (quantity > 1) {
+      dispatch(updateQuantity({ userId, productId: item.id, quantity: quantity - 1 }));
+    }
+  }
+
+  useEffect(() => {
+    if (!imageURL) {
+      dispatch(fetchProductImage(item.id));
+    }
+  }, [item.id, imageURL, dispatch]);
+
+  return (
+    <div className={styles.bagItemContainer}>
+      <div className={styles.itemLeftPart}>
+        <img className={styles.bagItemImg} src={imageURL} alt="productImage" />
+      </div>
+      <div className={styles.itemRightPart}>
+        <div className="company">{item.brand}</div>
+        <div className="item-name">{item.name}</div>
+        <div className="price-container">
+          <span className="current-price">Rs {item.price}</span>
+          <span className="original-price">Rs {item.currentPrice}</span>
+          <span className="discount-percentage">
+            ({item.discountedPercentage}% OFF)
+          </span>
+        </div>
+
+        <div className={styles.quantityControls}>
+          <button onClick={handleDecreaseQuantity} disabled={quantity <= 1}>-</button>
+          <span>{quantity}</span>
+          <button onClick={handleIncreaseQuantity}>+</button>
+        </div>
+
+        <div className={styles.returnPeriod}>
+          <span className={styles.returnPeriodDays}>{item.returnPeriod} days</span>{" "}
+          return available
+        </div>
+        <div className={styles.deliveryDetails}>
+          Delivery by <span className={styles.deliveryDetailsDays}>{item.deliveryDate}</span>
+        </div>
+      </div>
+
+      <div className={styles.removeFromCart} onClick={handleRemoveItem}>
+        <RiDeleteBinFill />
+      </div>
+    </div>
+  );
+}
+
+
+// File: BagItem.module.css
+
+/* In BagItem.module.css */
+.quantityControls {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.quantityControls button {
+    width: 30px;
+    height: 30px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.quantityControls button:hover {
+    background-color: #f0f0f0;
+}
+
+.quantityControls button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.quantityControls span {
+    margin: 0 10px;
+    font-size: 16px;
+}
+
+.bagItemContainer {
+    margin-bottom: 16px;
+    background: #fff;
+    font-size: 14px;
+    border: 1px solid #eaeaec;
+    border-radius: 4px;
+    position: relative;
+    padding: 16px;
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+    display: flex;
+    align-items: flex-start;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.bagItemContainer:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.itemLeftPart {
+    background: rgb(255, 242, 223);
+    height: 148px;
+    width: 111px;
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.itemRightPart {
+    padding-left: 16px;
+    position: relative;
+    min-height: 148px;
+    flex-grow: 1;
+    margin-left: 16px;
+}
+
+.bagItemImg {
+    width: 100%;
+    border-radius: 4px;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.bagItemImg:hover {
+    transform: scale(1.05);
+}
+
+.returnPeriod {
+    display: inline-flex;
+    font-size: 14px;
+    padding-top: 8px;
+}
+
+.returnPeriodDays {
+    font-weight: 700;
+    margin-right: 4px;
+}
+
+.deliveryDetails {
+    margin-top: 5px;
+    color: #282c3f;
+    font-size: 12px;
+    letter-spacing: -0.1px;
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.deliveryDetailsDays {
+    color: #03a685;
+}
+
+.removeFromCart {
+    position: absolute;
+    font-size: 20px;
+    top: 10px;
+    right: 10px;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.removeFromCart:hover {
+    color: #ff4d4f; /* Example hover color */
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+    .bagItemContainer {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .itemLeftPart {
+        width: 100%;
+        height: auto;
+    }
+
+    .itemRightPart {
+        margin-left: 0;
+        padding-left: 0;
+    }
+}
+
+
+// File: BagSummary.jsx
+
+import React from "react";
+import { useSelector } from "react-redux";
+
+function BagSummary() {
+  const bagState = useSelector((state) => state.bag);
+  const items = bagState?.items || [];
+
+  let totalMRP = 0;
+  let totalDiscount = 0;
+  const CONVENIENCE_FEES = 99;
+
+  items.forEach((item) => {
+    const product = item.product;
+    totalMRP += product.price * item.quantity;
+    const discountAmount = (product.price * product.discountedPercentage * item.quantity) / 100;
+    totalDiscount += discountAmount;
+  });
+
+  const finalPayment = totalMRP - totalDiscount + CONVENIENCE_FEES;
+
+  return (
+    <div className="bag-summary">
+      <div className="bag-details-container">
+        <div className="price-header">PRICE DETAILS ({items.length} Items)</div>
+        <div className="price-item">
+          <span className="price-item-tag">Total MRP</span>
+          <span className="price-item-value">₹{totalMRP.toFixed(2)}</span>
+        </div>
+        <div className="price-item">
+          <span className="price-item-tag">Discount on MRP</span>
+          <span className="price-item-value priceDetail-base-discount">
+            -₹{totalDiscount.toFixed(2)}
+          </span>
+        </div>
+        <div className="price-item">
+          <span className="price-item-tag">Convenience Fee</span>
+          <span className="price-item-value">₹{CONVENIENCE_FEES}</span>
+        </div>
+        <hr />
+        <div className="price-footer">
+          <span className="price-item-tag">Total Amount</span>
+          <span className="price-item-value">₹{finalPayment.toFixed(2)}</span>
+        </div>
+      </div>
+      <button className="btn-place-order">
+        <div className="css-xjhrni">PLACE ORDER</div>
+      </button>
+    </div>
+  );
+}
+
+export default BagSummary;
+
+
+// File: Fetchitems.jsx
+
+import { useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { fetchStatusActions } from "../../store/slices/fetchStatusSlice.js";
+import { fetchHomeItems, addInitialItems } from "../../store/slices/itemsSlice.js";
+
+const FetchItems = () => {
+  const fetchStatus = useSelector((store) => store.fetchStatus);
+  const itemsStatus = useSelector((store) => store.items.status);
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    if (fetchStatus.fetchDone || itemsStatus !== 'idle') return;
+
+    dispatch(fetchStatusActions.markFetchingStarted());
+    dispatch(fetchHomeItems())
+      .unwrap()
+      .then((products) => {
+        dispatch(fetchStatusActions.markFetchDone());
+        dispatch(fetchStatusActions.markFetchingFinished());
+        dispatch(addInitialItems(products));
+      })
+      .catch((error) => {
+        console.error("Failed to fetch products:", error);
+        dispatch(fetchStatusActions.markFetchingFailed());
+      });
+
+  }, [fetchStatus, itemsStatus, dispatch]);
+
+  return <></>;
+};
+
+export default FetchItems;
+
+
+// File: Footer.jsx
+
+export default function Footer() {
+  return (
+    <footer>
+      <div className="footer_container">
+        <div className="footer_column">
+          <h3>ONLINE SHOPPING</h3>
+
+          <a href="#">Men</a>
+          <a href="#">Women</a>
+          <a href="#">Kids</a>
+          <a href="#">Home & Living</a>
+          <a href="#">Beauty</a>
+          <a href="#">Gift Card</a>
+          <a href="#">Myntra Insider</a>
+        </div>
+
+        <div className="footer_column">
+          <h3>ONLINE SHOPPING</h3>
+
+          <a href="#">Men</a>
+          <a href="#">Women</a>
+          <a href="#">Kids</a>
+          <a href="#">Home & Living</a>
+          <a href="#">Beauty</a>
+          <a href="#">Gift Card</a>
+          <a href="#">Myntra Insider</a>
+        </div>
+
+        <div className="footer_column">
+          <h3>ONLINE SHOPPING</h3>
+
+          <a href="#">Men</a>
+          <a href="#">Women</a>
+          <a href="#">Kids</a>
+          <a href="#">Home & Living</a>
+          <a href="#">Beauty</a>
+          <a href="#">Gift Card</a>
+          <a href="#">Myntra Insider</a>
+        </div>
+      </div>
+      <hr />
+
+      <div className="copyright">
+        © 2023 www.myntra.com. All rights reserved.
+      </div>
+    </footer>
+  );
+}
+
+
+// File: SearchBar.jsx
+
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import styles from "./SearchBar.module.css"; // Import CSS Module
+import { useNavigate } from "react-router-dom";
+
+export default function SearchBar() {
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (query.length > 2) {
+      // Trigger search only if the query length is greater than 2
+      axios
+        .get(`http://localhost:8080/api/products/suggestions`, {
+          params: { query },
+        })
+        .then((response) => {
+          setSuggestions(response.data);
+        })
+        .catch((error) => {
+          console.error("Error fetching suggestions:", error);
+        });
+    } else {
+      setSuggestions([]);
+    }
+  }, [query]);
+
+  const handleChange = (e) => {
+    setQuery(e.target.value);
+  };
+
+  const handleSuggestionClick = (productId) => {
+    navigate(`products/${productId}`)
+  }
+
+  return (
+    <div className={styles.searchBar}>
+      <input
+        type="text"
+        value={query}
+        onChange={handleChange}
+        placeholder="Search for products..."
+        className={styles.searchInput}
+      />
+      {suggestions.length > 0 && (
+        <ul className={styles.suggestionsList}>
+          {suggestions.map((product) => (
+            <li key={product.id} className={styles.suggestionItem} onClick={() => handleSuggestionClick(product.id)}>
+              {product.name}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+
+// File: SearchBar.module.css
+
+/* SearchBar.module.css */
+
+.searchBar {
+    position: relative;
+    width: 100%;
+  }
+  
+  .searchInput {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  
+  .suggestionsList {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    border: 1px solid #ccc;
+    border-top: none;
+    background: white;
+    z-index: 1000;
+    max-height: 200px;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  
+  .suggestionItem {
+    padding: 8px;
+    cursor: pointer;
+  }
+  
+  .suggestionItem:hover {
+    background-color: #f0f0f0;
+  }
+  
+
+
+// File: Spinner.jsx
+
+export default function Spinner() {
+  return (
+    <div className="d-flex justify-content-center spinner">
+      <div
+        className="spinner-border"
+        role="status"
+        style={{ width: "5rem", height: "5rem" }}
+      >
+        <span className="visually-hidden">Loading...</span>
+      </div>
+    </div>
+  );
+}
+
+
+// File: Header.jsx
+
+import React, { useState } from "react";
+import { FcBusinesswoman, FcLike } from "react-icons/fc";
+import { FaShoppingBag } from "react-icons/fa";
+import {Link, NavLink, useNavigate} from "react-router-dom";
+import { useSelector } from "react-redux";
+import ProfileCard from "./ProfileCard";
+import SearchBar from "../common/SearchBar.jsx";
+
+export default function Header() {
+
+  const user = useSelector(state => state.auth);
+  const bagState = useSelector((store) => store.bag);
+  const navigate = useNavigate();
+  const isAuthenticated = user.isAuthenticated
+
+  const bag = useSelector((store) => store.bag);
+  const [isProfileCardVisible, setIsProfileCardVisible] = useState(false);
+  const bagItemsCount = bagState?.items?.length || 0;
+
+  const handleBagClick = () => {
+    if (isAuthenticated)  return navigate("/bag");
+    return navigate("/login")
+  }
+
+  const handleMouseEnter = () => {
+    setIsProfileCardVisible(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsProfileCardVisible(false);
+  };
+
+  return (
+    <header className="header-fix">
+      <div className="logo_container">
+        <Link to="/">
+          <img
+            className="myntra_home"
+            src="/images/myntra_logo.webp"
+            alt="Myntra Home"
+          />
+        </Link>
+      </div>
+      <nav className="nav_bar">
+        <a href="#">Men</a>
+        <a href="#">Women</a>
+        <a href="#">Kids</a>
+        <a href="#">Home & Living</a>
+        <a href="#">Beauty</a>
+        <a href="#">
+          Studio <sup>New</sup>
+        </a>
+      </nav>
+      <SearchBar />
+      <div className="action_bar">
+        {/* Profile Container with hover detection */}
+        <div
+          className="action_container"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          style={{ position: "relative" }}
+        >
+          <FcBusinesswoman />
+          <span className="action_name">Profile</span>
+
+          {/* Conditional rendering of ProfileCard */}
+          {isProfileCardVisible && (
+            <div style={{ position: "absolute", top: "100%", right: "0" }}>
+              <ProfileCard />
+            </div>
+          )}
+        </div>
+
+        <div className="action_container">
+          <FcLike />
+          <span className="action_name">Wishlist</span>
+        </div>
+
+        <div onClick={handleBagClick} className="action_container">
+          <FaShoppingBag />
+          <span className="action_name">Bag</span>
+          <span className="bag-item-count">{bagItemsCount}</span>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+
+// File: Header.module.css
+
+/* Add this to your existing CSS file */
+
+.action_container {
+    cursor: pointer; /* Changes cursor to pointer when hovering over the profile icon */
+}
+
+.card {
+    position: absolute;
+    top: 100%; /* Positions the card below the profile icon */
+    right: 0;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    padding: 15px;
+    width: 200px;
+    z-index: 9999;
+    display: none; /* Initially hidden */
+    transition: opacity 0.3s ease-in-out;
+    opacity: 0;
+}
+
+/* CSS for making the card visible when hovering over the profile icon */
+.profile_icon:hover + .card {
+    display: block;
+    opacity: 1;
+}
+
+
+// File: ProfileCard.jsx
+
+import React from "react";
+import styles from "./ProfileCard.module.css";
+import { Link } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { logoutUser } from "../../store/slices/authSlice.js";
+
+const ProfileCard = () => {
+  const dispatch = useDispatch();
+  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
+
+  const handleLogout = () => {
+    dispatch(logoutUser());
+  };
+
+  return (
+    <div className={`${styles.card} ${styles.visible}`}>
+      <ul className={styles.menu}>
+        {isAuthenticated ? (
+          <li>
+            <button className={styles.logoutButton} onClick={handleLogout}>
+              Logout
+            </button>
+            {/* Change to logout button */}
+          </li>
+        ) : (
+          <>
+            <li>
+              <Link to="/login">Login</Link>
+            </li>
+            <li>
+              <Link to="/signup">Signup</Link>
+            </li>
+          </>
+        )}
+        <li>
+          <a href="/orders">Your Orders</a>
+        </li>
+        <li>
+          <a href="/wishlist">Wishlist</a>
+        </li>
+        <li>
+          <a href="/contact">Contact Us</a>
+        </li>
+      </ul>
+    </div>
+  );
+};
+
+export default ProfileCard;
+
+
+// File: ProfileCard.module.css
+
+.card {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background-color: #ffffff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    width: 250px;
+    z-index: 9999;
+    display: none; /* Hidden by default */
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.card.visible {
+    display: block; /* Show when visible */
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.menu {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.menu li {
+    margin-bottom: 10px;
+}
+
+.menu li:last-child {
+    margin-bottom: 0;
+}
+
+.menu a {
+    text-decoration: none;
+    color: #282c3f;
+    font-size: 14px;
+    font-weight: 600;
+    transition: color 0.3s ease;
+}
+
+.menu a:hover {
+    color: #f54e77; /* Accent color on hover */
+}
+
+.logoutButton {
+    background-color: #ff4b5c;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+}
+
+
+// File: HomeCarousel.jsx
+
+import React from "react";
+import { Carousel } from "react-responsive-carousel";
+import styles from "./HomeCarousel.module.css"; // Importing the module
+
+const HomeCarousel = () => {
+  return (
+    <Carousel
+      showThumbs={false} // Disables thumbnail previews
+      autoPlay={true} // enable auto slide
+      infiniteLoop={true} // enable infinte loop
+      interval={3000} // set the time for each slide
+      showStatus={false} // remove slide indicator
+      showIndicators={false} // this hides the dots
+    >
+      <div>
+        <img
+          className={styles.carouselImage}
+          src="/images/1.avif"
+          alt="Slide 1"
+        />
+        <p className={styles.legend}>Upto 40% OFF</p>
+      </div>
+      <div>
+        <img
+          className={styles.carouselImage}
+          src="/images/2.jpg"
+          alt="Slide 2"
+        />
+        <p className={styles.legend}>Explore collection</p>
+      </div>
+      <div>
+        <img
+          className={styles.carouselImage}
+          src="/images/3.jpg"
+          alt="Slide 3"
+        />
+        <p className={styles.legend}>Asthetic look</p>
+      </div>
+    </Carousel>
+  );
+};
+
+export default HomeCarousel;
+
+
+// File: HomeCarousel.module.css
+
+.carouselContainer {
+  width: 100vw;            /* Full width of the viewport */
+  height: 80vh;            /* 80% of the viewport height */
+  margin: 0 auto;
+  overflow: hidden;
+  position: relative;      /* Ensure positioning for the legend */
+}
+
+.carouselImage {
+  width: 100vw;            /* Ensure full width for all images */
+  height: 80vh;            /* Set height to 80% of the viewport */
+  object-fit: cover;       /* Maintain aspect ratio, cropping if necessary */
+}
+
+.legend {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font-size: 1.5rem;
+  font-weight: bold;
+  background-color: rgba(0, 0, 0, 0.5);  /* Semi-transparent background for readability */
+  padding: 10px;
+  border-radius: 5px;
+}
+
+
+
+// File: HomeItem.jsx
+
+import React, { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { addToBag, removeFromBag } from "../../store/slices/bagSlice.js";
+import { IoMdAdd } from "react-icons/io";
+import { MdDeleteForever } from "react-icons/md";
+import { fetchProductImage } from "../../store/slices/imageSlice.js";
+import { Link, useNavigate } from "react-router-dom";
+import styles from "./HomeItem.module.css";
+
+export default function HomeItem({ item }) {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const bagItems = useSelector((state) => state.bag.items);
+  const imageURL = useSelector((store) => store.images[item.id]);
+  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
+  const user = useSelector((state) => state.auth.user);
+
+  const elementFound = bagItems.some(bagItem => bagItem.product.id === item.id);
+
+  useEffect(() => {
+    if (!imageURL) {
+      dispatch(fetchProductImage(item.id));
+    }
+  }, [item.id, imageURL, dispatch]);
+
+  const handleAddToBag = () => {
+    if (!isAuthenticated) {
+      navigate("/login");
+    } else {
+      dispatch(addToBag({ userId: user.id, productId: item.id, quantity: 1 }));
+    }
+  };
+
+  const handleRemove = () => {
+    dispatch(removeFromBag({ userId: user.id, productId: item.id, quantity: 1 }));
+  };
+
+  return (
+    <div className={styles.itemContainer}>
+      <Link to={`product/${item.id}`} className={styles.link}>
+        <img className={styles.itemImage} src={imageURL} alt="item" />
+        <div className={styles.rating}>
+          {/* Display rating stars */}
+          {/* {item.rating.stars} ⭐ | {item.rating.count} reviews */}
+        </div>
+        <div className={styles.companyName}>{item.brand}</div>
+        <div className={styles.itemName}>{item.name}</div>
+        <div className={styles.price}>
+          <span className={styles.currentPrice}>Rs {item.price}</span>
+          <span className={styles.originalPrice}>Rs {item.originalPrice}</span>
+          <span className={styles.discount}>({item.discountedPercentage}% OFF)</span>
+        </div>
+      </Link>
+      {elementFound ? (
+        <button
+          type="button"
+          className={`${styles.btnAddBag} ${styles.btnDanger}`}
+          onClick={handleRemove}
+        >
+          <MdDeleteForever />
+          Remove
+        </button>
+      ) : (
+        <button
+          type="button"
+          className={`${styles.btnAddBag} ${styles.btnSuccess}`}
+          onClick={handleAddToBag}
+        >
+          <IoMdAdd />
+          Add to Bag
+        </button>
+      )}
+    </div>
+  );
+}
+
+
+// File: HomeItem.module.css
+
+.itemsContainer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center; /* Center align items */
+    width: 80%;
+    margin: 40px auto; /* Center container */
+}
+
+.itemContainer {
+    width: calc(20% - 20px); /* 5 items per row with margin adjustment */
+    margin: 10px;
+    border-radius: 10px; /* Rounded corners */
+    overflow: hidden; /* Round corners for image */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow effect */
+    transition: transform 0.3s, box-shadow 0.3s; /* Animation on hover */
+    background-color: #ffffff; /* White background for clean look */
+    position: relative; /* For positioning effects */
+    display: flex; /* Enable flexbox */
+    flex-direction: column; /* Stack elements vertically */
+    align-items: center; /* Center horizontally */
+    justify-content: center; /* Center vertically */
+    height: 390px; /* Fixed height for uniformity */
+}
+
+.itemImage {
+    width: 100%;
+    height: 250px; /* Increased height for uniformity */
+    object-fit: cover; /* Cover the image */
+    transition: transform 0.3s; /* Smooth zoom effect */
+}
+
+.itemContainer:hover .itemImage {
+    transform: scale(1.05); /* Slight zoom effect on hover */
+}
+
+.rating {
+    font-size: 14px;
+    font-weight: 700;
+    color: #ff905a; /* Color for rating */
+    margin: 8px 0; /* Margin for spacing */
+}
+
+/* No text decoration for links and elements */
+.companyName,
+.itemName,
+.price {
+    margin: 0; /* Remove default margin */
+    color: #282c3f; /* Uniform color */
+    font-size: 16px; /* Adjust font size */
+    font-weight: 600; /* Stronger font weight for brand and item names */
+    line-height: 1.2; /* Improved line height */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap; /* No wrap for clean look */
+    text-decoration: none; /* Remove underline */
+    text-align: center; /* Center align text */
+}
+
+/* For link elements specifically */
+a {
+    text-decoration: none; /* Remove underline from all links */
+}
+
+.price {
+    margin-top: 10px;
+    font-size: 16px; /* Slightly larger for emphasis */
+    line-height: 1.4; /* Improve spacing */
+}
+
+.currentPrice {
+    font-weight: 700;
+}
+
+.originalPrice {
+    text-decoration: line-through;
+    color: #7e818c;
+    font-weight: 400;
+    margin-left: 5px;
+    font-size: 14px;
+}
+
+.discount {
+    color: #ff905a;
+    font-weight: 400;
+    font-size: 14px;
+    margin-left: 5px;
+}
+
+.btnAddBag {
+    margin-top: 10px;
+    font-size: 16px;
+    width: 100%;
+    background-color: #ff3f6c; /* Myntra button color */
+    border: none;
+    padding: 10px 15px;
+    border-radius: 10px;
+    cursor: pointer;
+    color: white; /* White text */
+    font-weight: 600; /* Bold button text */
+    transition: background-color 0.3s, transform 0.3s; /* Animation for button */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+}
+
+.btnAddBag:hover {
+    background-color: #ff2a4d; /* Darker Myntra red on hover */
+    transform: translateY(-2px); /* Lift effect on hover */
+}
+
+.btn-danger {
+    background-color: #f44336; /* Red color for remove button */
+}
+
+.btn-danger:hover {
+    background-color: #e53935; /* Darker red on hover */
+}
+
+
+// File: ProductPage.jsx
+
+import React, { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
+import {
+  FaShoppingCart,
+  FaStar,
+  FaChevronDown,
+  FaChevronUp,
+} from "react-icons/fa";
+import { motion } from "framer-motion";
+import styles from "./ProductPage.module.css";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchProductImage } from "../../store/slices/imageSlice";
+import { addToBag } from "../../store/slices/bagSlice"; // Adjust import path as needed
+
+const ProductPage = () => {
+  const { id } = useParams(); // Get the product ID from the URL
+  const [product, setProduct] = useState(null); // Initialize product state
+  const [sizes, setSizes] = useState([]);
+  const [colors, setColors] = useState([]);
+  const [selectedSize, setSelectedSize] = useState("");
+  const [selectedColor, setSelectedColor] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [showSizes, setShowSizes] = useState(false);
+  const [showColors, setShowColors] = useState(false);
+  const dispatch = useDispatch();
+  const imageURL = useSelector((store) => store.images[id]);
+
+  useEffect(() => {
+    // Fetch product data when component mounts or ID changes
+    const fetchProduct = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:8080/api/products/${id}`
+        );
+        const data = await response.json();
+        setProduct(data); // Set product data to state
+        if (!imageURL) {
+          dispatch(fetchProductImage(id));
+        }
+      } catch (error) {
+        console.error("Failed to fetch product:", error);
+      }
+    };
+
+    const fetchSizesAndColors = async () => {
+      try {
+        const sizesResponse = await fetch("http://localhost:8080/api/sizes");
+        const colorsResponse = await fetch("http://localhost:8080/api/colors");
+        const sizesData = await sizesResponse.json();
+        const colorsData = await colorsResponse.json();
+        setSizes(sizesData);
+        setColors(colorsData);
+      } catch (error) {
+        console.error("Failed to fetch sizes or colors:", error);
+      }
+    };
+
+    fetchProduct();
+    fetchSizesAndColors();
+  }, [id, imageURL, dispatch]);
+
+  const handleAddToCart = () => {
+    dispatch(
+      addToBag(id, {
+        size: selectedSize,
+        color: selectedColor,
+        quantity,
+      })
+    );
+  };
+
+  if (!product) {
+    return <div>Loading...</div>; // Handle loading state
+  }
+
+  return (
+    <div className={styles.container}>
+      <div className={styles.flexContainer}>
+        <motion.div
+          className={styles.imageWrapper}
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <img
+            src={imageURL || product.imageURL}
+            alt={product.title}
+            className={styles.productImage}
+          />
+        </motion.div>
+        <motion.div
+          className={styles.detailsWrapper}
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
+          <h1 className={styles.productTitle}>{product.title}</h1>
+          <p className={styles.productDescription}>{product.description}</p>
+          <div className={styles.priceWrapper}>
+            <span className={styles.productPrice}>
+              ${product.price.toFixed(2)}
+            </span>
+            {product.discount > 0 && (
+              <>
+                <span className="text-lg text-gray-500 line-through">
+                  ${product.price.toFixed(2)}
+                </span>
+                <span className="ml-2 text-green-500 font-semibold">
+                  {product.discount}% OFF
+                </span>
+              </>
+            )}
+          </div>
+          <div className={styles.ratingWrapper}>
+            <div className={styles.starRating}>
+              {[...Array(5)].map((_, i) => (
+                <FaStar
+                  key={i}
+                  className={
+                    i < Math.floor(product.rating)
+                      ? styles.starFilled
+                      : styles.starEmpty
+                  }
+                />
+              ))}
+            </div>
+            <span className={styles.reviewCount}>
+              {product.reviews} reviews
+            </span>
+          </div>
+          {/* Dropdowns for size and color selection */}
+          <div className={styles.optionWrapper}>
+            <div
+              className={styles.dropdownWrapper}
+              onClick={() => setShowSizes(!showSizes)}
+            >
+              <button className={styles.dropdownButton}>
+                {selectedSize || "Select Size"}
+                {showSizes ? <FaChevronUp /> : <FaChevronDown />}
+              </button>
+              {showSizes && (
+                <motion.div
+                  className={styles.dropdownMenu}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {sizes.map((sizeObj) => (
+                    <div
+                      key={sizeObj.id}
+                      className={styles.dropdownItem}
+                      onClick={() => {
+                        setSelectedSize(sizeObj.name);
+                        setShowSizes(false);
+                      }}
+                    >
+                      {sizeObj.name}
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+            </div>
+          </div>
+          <div className={styles.optionWrapper}>
+            <div
+              className={styles.dropdownWrapper}
+              onClick={() => setShowColors(!showColors)}
+            >
+              <button className={styles.dropdownButton}>
+                {selectedColor || "Select Color"}
+                {showColors ? <FaChevronUp /> : <FaChevronDown />}
+              </button>
+              {showColors && (
+                <motion.div
+                  className={styles.dropdownMenu}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {colors.map((colorObj) => (
+                    <div
+                      key={colorObj.id}
+                      className={styles.dropdownItem}
+                      onClick={() => {
+                        setSelectedColor(colorObj.name);
+                        setShowColors(false);
+                      }}
+                    >
+                      {colorObj.name}
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+            </div>
+          </div>
+          <div className={styles.quantityWrapper}>
+            <button
+              className={styles.quantityButton}
+              onClick={() => setQuantity(Math.max(1, quantity - 1))}
+            >
+              -
+            </button>
+            <span className={styles.quantityDisplay}>{quantity}</span>
+            <button
+              className={styles.quantityButton}
+              onClick={() => setQuantity(quantity + 1)}
+            >
+              +
+            </button>
+          </div>
+          <motion.button
+            className={styles.addToCartButton}
+            onClick={handleAddToCart}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <FaShoppingCart className={styles.cartIcon} />
+            Add to Cart
+          </motion.button>
+        </motion.div>
+      </div>
+    </div>
+  );
+};
+
+export default ProductPage;
+
+// import React, { useState, useEffect } from "react";
+// import { useParams } from "react-router-dom";
+// import {
+//   FaShoppingCart,
+//   FaStar,
+//   FaChevronDown,
+//   FaChevronUp,
+// } from "react-icons/fa";
+// import { motion } from "framer-motion";
+// import styles from "./ProductPage.module.css";
+// import { useDispatch, useSelector } from "react-redux";
+// import { fetchProductImage } from "../../store/slices/imageSlice";
+// import { bagActions } from "../../store/slices/bagSlice";
+
+// const ProductPage = () => {
+//   const { id } = useParams(); // Get the product ID from the URL
+//   const [product, setProduct] = useState(null); // Initialize product state
+//   const [sizes, setSizes] = useState([]);
+//   const [colors, setColors] = useState([]);
+//   const [selectedSize, setSelectedSize] = useState("");
+//   const [selectedColor, setSelectedColor] = useState("");
+//   const [quantity, setQuantity] = useState(1);
+//   const [showSizes, setShowSizes] = useState(false);
+//   const [showColors, setShowColors] = useState(false);
+//   const dispatch = useDispatch();
+//   const imageURL = useSelector((store) => store.images[id]);
+
+//   useEffect(() => {
+//     // Fetch product data when component mounts or ID changes
+//     const fetchProduct = async () => {
+//       try {
+//         const response = await fetch(
+//           `http://localhost:8080/api/products/${id}`
+//         );
+//         const data = await response.json();
+//         setProduct(data); // Set product data to state
+//         if (!imageURL) {
+//           dispatch(fetchProductImage(id));
+//         }
+//       } catch (error) {
+//         console.error("Failed to fetch product:", error);
+//       }
+//     };
+
+//     const fetchSizesAndColors = async () => {
+//       try {
+//         const sizesResponse = await fetch("http://localhost:8080/api/sizes");
+//         const colorsResponse = await fetch("http://localhost:8080/api/colors");
+//         const sizesData = await sizesResponse.json();
+//         const colorsData = await colorsResponse.json();
+//         setSizes(sizesData);
+//         setColors(colorsData);
+//       } catch (error) {
+//         console.error("Failed to fetch sizes or colors:", error);
+//       }
+//     };
+
+//     fetchProduct();
+//     fetchSizesAndColors();
+//   }, [id, imageURL, dispatch]);
+
+//   const handleAddToCart = () => {
+//     dispatch(
+//       bagActions.addToBag(id, {
+//         size: selectedSize,
+//         color: selectedColor,
+//         quantity,
+//       })
+//     );
+//     console.log("Added to cart:", {
+//       product: product.name,
+//       size: selectedSize,
+//       color: selectedColor,
+//       quantity,
+//     });
+//   };
+
+//   const addSize = async (newSize) => {
+//     try {
+//       const response = await fetch("http://localhost:8080/api/sizes", {
+//         method: "POST",
+//         headers: {
+//           "Content-Type": "application/json",
+//         },
+//         body: JSON.stringify({ name: newSize }),
+//       });
+//       const data = await response.json();
+//       setSizes([...sizes, data]);
+//     } catch (error) {
+//       console.error("Failed to add size:", error);
+//     }
+//   };
+
+//   const addColor = async (newColor) => {
+//     try {
+//       const response = await fetch("http://localhost:8080/api/colors", {
+//         method: "POST",
+//         headers: {
+//           "Content-Type": "application/json",
+//         },
+//         body: JSON.stringify({ name: newColor }),
+//       });
+//       const data = await response.json();
+//       setColors([...colors, data]);
+//     } catch (error) {
+//       console.error("Failed to add color:", error);
+//     }
+//   };
+
+//   if (!product) {
+//     return <div>Loading...</div>; // Handle loading state
+//   }
+
+//   return (
+//     <div className={styles.container}>
+//       <div className={styles.flexContainer}>
+//         <motion.div
+//           className={styles.imageWrapper}
+//           initial={{ opacity: 0, x: -50 }}
+//           animate={{ opacity: 1, x: 0 }}
+//           transition={{ duration: 0.5 }}
+//         >
+//           <img
+//             src={imageURL || product.imageURL}
+//             alt={product.title}
+//             className={styles.productImage}
+//           />
+//         </motion.div>
+//         <motion.div
+//           className={styles.detailsWrapper}
+//           initial={{ opacity: 0, x: 50 }}
+//           animate={{ opacity: 1, x: 0 }}
+//           transition={{ duration: 0.5, delay: 0.2 }}
+//         >
+//           <h1 className={styles.productTitle}>{product.title}</h1>
+//           <p className={styles.productDescription}>{product.description}</p>
+//           <div className={styles.priceWrapper}>
+//             <span className={styles.productPrice}>
+//               ${product.price.toFixed(2)}
+//             </span>
+//             {product.discount > 0 && (
+//               <>
+//                 <span className="text-lg text-gray-500 line-through">
+//                   ${product.price.toFixed(2)}
+//                 </span>
+//                 <span className="ml-2 text-green-500 font-semibold">
+//                   {product.discount}% OFF
+//                 </span>
+//               </>
+//             )}
+//           </div>
+//           <div className={styles.ratingWrapper}>
+//             <div className={styles.starRating}>
+//               {[...Array(5)].map((_, i) => (
+//                 <FaStar
+//                   key={i}
+//                   className={
+//                     i < Math.floor(product.rating)
+//                       ? styles.starFilled
+//                       : styles.starEmpty
+//                   }
+//                 />
+//               ))}
+//             </div>
+//             <span className={styles.reviewCount}>
+//               {product.reviews} reviews
+//             </span>
+//           </div>
+//           {/* Dropdowns for size and color selection */}
+//           <div className={styles.optionWrapper}>
+//             <div
+//               className={styles.dropdownWrapper}
+//               onClick={() => setShowSizes(!showSizes)}
+//             >
+//               <button className={styles.dropdownButton}>
+//                 {selectedSize || "Select Size"}
+//                 {showSizes ? <FaChevronUp /> : <FaChevronDown />}
+//               </button>
+//               {showSizes && (
+//                 <motion.div
+//                   className={styles.dropdownMenu}
+//                   initial={{ opacity: 0, y: -10 }}
+//                   animate={{ opacity: 1, y: 0 }}
+//                   exit={{ opacity: 0, y: -10 }}
+//                   transition={{ duration: 0.2 }}
+//                 >
+//                   {(product.sizes || []).map((size) => (
+//                     <div
+//                       key={size}
+//                       className={styles.dropdownItem}
+//                       onClick={() => {
+//                         setSelectedSize(size);
+//                         setShowSizes(false);
+//                       }}
+//                     >
+//                       {size}
+//                     </div>
+//                   ))}
+//                 </motion.div>
+//               )}
+//             </div>
+//           </div>
+//           <div className={styles.optionWrapper}>
+//             <div
+//               className={styles.dropdownWrapper}
+//               onClick={() => setShowColors(!showColors)}
+//             >
+//               <button className={styles.dropdownButton}>
+//                 {selectedColor || "Select Color"}
+//                 {showColors ? <FaChevronUp /> : <FaChevronDown />}
+//               </button>
+//               {showColors && (
+//                 <motion.div
+//                   className={styles.dropdownMenu}
+//                   initial={{ opacity: 0, y: -10 }}
+//                   animate={{ opacity: 1, y: 0 }}
+//                   exit={{ opacity: 0, y: -10 }}
+//                   transition={{ duration: 0.2 }}
+//                 >
+//                   {(product.colors || []).map((color) => (
+//                     <div
+//                       key={color}
+//                       className={styles.dropdownItem}
+//                       onClick={() => {
+//                         setSelectedColor(color);
+//                         setShowColors(false);
+//                       }}
+//                     >
+//                       {color}
+//                     </div>
+//                   ))}
+//                 </motion.div>
+//               )}
+//             </div>
+//           </div>
+//           <div className={styles.quantityWrapper}>
+//             <button
+//               className={styles.quantityButton}
+//               onClick={() => setQuantity(Math.max(1, quantity - 1))}
+//             >
+//               -
+//             </button>
+//             <span className={styles.quantityDisplay}>{quantity}</span>
+//             <button
+//               className={styles.quantityButton}
+//               onClick={() => setQuantity(quantity + 1)}
+//             >
+//               +
+//             </button>
+//           </div>
+//           <motion.button
+//             className={styles.addToCartButton}
+//             onClick={handleAddToCart}
+//             whileHover={{ scale: 1.05 }}
+//             whileTap={{ scale: 0.95 }}
+//           >
+//             <FaShoppingCart className={styles.cartIcon} />
+//             Add to Cart
+//           </motion.button>
+//         </motion.div>
+//       </div>
+//     </div>
+//   );
+// };
+
+// export default ProductPage;
+
+
+// File: ProductPage.module.css
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.flexContainer {
+  display: flex;
+  flex-direction: column;
+  @media (min-width: 768px) {
+    flex-direction: row;
+  }
+}
+
+.imageWrapper {
+  width: 100%;
+  margin-bottom: 2rem;
+  @media (min-width: 768px) {
+    width: 50%;
+    margin-bottom: 0;
+  }
+}
+
+.productImage {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s;
+}
+
+.productImage:hover {
+  transform: scale(1.05);
+}
+
+.detailsWrapper {
+  width: 100%;
+  padding-left: 1rem;
+  @media (min-width: 768px) {
+    width: 50%;
+    padding-left: 2rem;
+  }
+}
+
+.productTitle {
+  font-size: 1.875rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
+.productDescription {
+  color: #4b5563;
+  margin-bottom: 1rem;
+}
+
+.priceWrapper {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.productPrice {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-right: 0.5rem;
+}
+
+.ratingWrapper {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.starRating {
+  display: flex;
+  color: #f59e0b;
+  margin-right: 0.5rem;
+}
+
+.starFilled {
+  color: #f59e0b;
+}
+
+.starEmpty {
+  color: #e5e7eb;
+}
+
+.reviewCount {
+  color: #4b5563;
+}
+
+.optionWrapper {
+  margin-bottom: 1rem;
+}
+
+.dropdownWrapper {
+  position: relative;
+  width: 100%;
+}
+
+.dropdownButton {
+  width: 100%;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  outline: none;
+  transition: ring 0.2s;
+}
+
+.dropdownButton:focus {
+  ring: 2px solid #3b82f6;
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-top: 0.25rem;
+  z-index: 10;
+}
+
+.dropdownItem {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.dropdownItem:hover {
+  background-color: #f3f4f6;
+}
+
+.quantityWrapper {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.quantityButton {
+  background-color: #e5e7eb;
+  color: #6b7280;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.quantityButton:hover {
+  background-color: #d1d5db;
+}
+
+.quantityDisplay {
+  background-color: #f3f4f6;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  margin: 0 0.5rem;
+}
+
+.addToCartButton {
+  background-color: #3b82f6;
+  color: #ffffff;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.addToCartButton:hover {
+  background-color: #2563eb;
+}
+
+.cartIcon {
+  margin-right: 0.5rem;
+}
+
+.relatedProducts {
+  margin-top: 3rem;
+}
+
+.relatedTitle {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 1.5rem;
+}
+
+.gridContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.relatedProduct {
+  background-color: #ffffff;
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: transform 0.3s;
+}
+
+.relatedProduct:hover {
+  transform: scale(1.05);
+}
+
+.relatedImage {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.relatedDetails {
+  padding: 1rem;
+}
+
+.relatedTitle {
+  font-size: 1.125rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.relatedPrice {
+  color: #6b7280;
+}
+
+
+// File: SizeColorForm.jsx
+
+import { useState } from "react";
+import styles from "./SizeColorForm.module.css"; // Import CSS module
+import { showErrorToast, showSuccessToast } from "../../utils/toastify";
+
+export default function SizeColorForm() {
+  const [newSize, setNewSize] = useState("");
+  const [newColor, setNewColor] = useState("");
+
+  const handleSizeSubmit = async (e) => {
+    e.preventDefault();
+    if (newSize) {
+      await addSize(newSize);
+      setNewSize("");
+    }
+  };
+
+  const handleColorSubmit = async (e) => {
+    e.preventDefault();
+    if (newColor) {
+      await addColor(newColor);
+      setNewColor("");
+    }
+  };
+
+  // Functions for adding size and color
+  const addSize = async (newSize) => {
+    try {
+      const response = await fetch("http://localhost:8080/api/sizes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: newSize }),
+      });
+      const data = await response.json();
+      showSuccessToast("Size added:", data);
+    } catch (error) {
+      showErrorToast("Failed to add size:", error);
+    }
+  };
+
+  const addColor = async (newColor) => {
+    try {
+      const response = await fetch("http://localhost:8080/api/colors", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: newColor }),
+      });
+      const data = await response.json();
+      showSuccessToast("Color added:", data);
+    } catch (error) {
+      showErrorToast("Failed to add color:", error);
+    }
+  };
+
+  return (
+    <div className={styles["form-container"]}>
+      {/* Form for adding new size */}
+      <form onSubmit={handleSizeSubmit}>
+        <label htmlFor="sizeInput" className={styles["form-label"]}>
+          Add Size:
+        </label>
+        <input
+          type="text"
+          id="sizeInput"
+          value={newSize}
+          onChange={(e) => setNewSize(e.target.value)}
+          placeholder="Enter new size"
+          className={styles["form-input"]}
+        />
+        <button type="submit" className={styles["form-button"]}>
+          Add Size
+        </button>
+      </form>
+
+      {/* Form for adding new color */}
+      <form onSubmit={handleColorSubmit}>
+        <label htmlFor="colorInput" className={styles["form-label"]}>
+          Add Color:
+        </label>
+        <input
+          type="text"
+          id="colorInput"
+          value={newColor}
+          onChange={(e) => setNewColor(e.target.value)}
+          placeholder="Enter new color"
+          className={styles["form-input"]}
+        />
+        <button type="submit" className={styles["form-button"]}>
+          Add Color
+        </button>
+      </form>
+    </div>
+  );
+}
+
+
+// File: SizeColorForm.module.css
+
+/* Container styles */
+.form-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background-color: #fff;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    max-width: 400px;
+    margin: 20px auto;
+  }
+  
+  /* Label styles */
+  .form-label {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #424242;
+    transition: color 0.3s ease-in-out;
+  }
+  
+  /* Input field styles */
+  .form-input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 20px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.3s ease-in-out;
+    background-color: #f9f9f9;
+  }
+  
+  /* Focus effect on input */
+  .form-input:focus {
+    border-color: #ff3e6c;
+    outline: none;
+    background-color: #fff;
+  }
+  
+  /* Button styles */
+  .form-button {
+    width: 100%;
+    padding: 12px;
+    background-color: #ff3e6c;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease-in-out, transform 0.3s ease-in-out;
+  }
+  
+  /* Hover and focus effects on button */
+  .form-button:hover,
+  .form-button:focus {
+    background-color: #e7355b;
+    transform: translateY(-2px);
+  }
+  
+  /* Input and button hover animation */
+  .form-input,
+  .form-button {
+    transition: all 0.3s ease-in-out;
+  }
+  
+  /* Container hover effect */
+  .form-container:hover .form-label {
+    color: #ff3e6c;
+  }
+  
+  /* Button active state */
+  .form-button:active {
+    background-color: #c52949;
+    transform: translateY(0);
+  }
+  
+
+
+// File: ProfileForm.jsx
+
+import { useEffect, useState } from "react";
+import styles from "./ProfileForm.module.css";
+import axiosInstance from "../../utils/api";
+import { useSelector } from "react-redux";
+import { Navigate } from "react-router-dom";
+
+const ProfileForm = () => {
+  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+
+  const user =
+    useSelector((state) => state.auth.user) ||
+    JSON.parse(localStorage.getItem("user")); // Fallback to localStorage
+  const userId = user?.id;
+
+  const [formData, setFormData] = useState({
+    firstName: user?.firstName || "",
+    lastName: user?.lastName || "",
+    email: user?.email || "",
+    gender: "",
+    defaultPhoneNumber: user?.defaultPhoneNumber || "",
+  });
+
+  useEffect(() => {
+    if (userId) {
+      const fetchUser = async () => {
+        try {
+          const response = await axiosInstance.get(`/api/users/${userId}`);
+          setFormData(response.data);
+        } catch (error) {
+          console.error("Error fetching user:", error);
+        }
+      };
+      fetchUser();
+    }
+  }, [userId]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    // Handle form submission
+    try {
+      const response = await axiosInstance.put(
+        `/api/users/${user.id}`,
+        formData
+      );
+      console.log("User updated successfully:", response.data);
+    } catch (error) {
+      console.error("Error updating user:", error);
+    }
+  };
+
+  return userId ? (
+    <form className={styles.profileForm} onSubmit={handleSubmit}>
+      <h2>Profile Form</h2>
+      <input
+        type="text"
+        name="firstName"
+        placeholder="First Name"
+        value={formData.firstName}
+        onChange={handleChange}
+        className={styles.inputField}
+        required
+      />
+      <input
+        type="text"
+        name="lastName"
+        placeholder="Last Name"
+        value={formData.lastName}
+        onChange={handleChange}
+        className={styles.inputField}
+        required
+      />
+      <input
+        type="email"
+        name="email"
+        placeholder="Email"
+        value={formData.email}
+        onChange={handleChange}
+        className={styles.inputField}
+        required
+      />
+      <select
+        name="gender"
+        value={formData.gender}
+        onChange={handleChange}
+        className={styles.inputField}
+        required
+      >
+        <option value="">Select Gender</option>
+        <option value="male">Male</option>
+        <option value="female">Female</option>
+        <option value="other">Other</option>
+      </select>
+      <input
+        type="tel"
+        name="defaultPhoneNumber"
+        placeholder="Phone Number"
+        value={formData.defaultPhoneNumber}
+        onChange={handleChange}
+        className={styles.inputField}
+        required
+      />
+      <button type="submit" className={styles.submitButton}>
+        Submit
+      </button>
+    </form>
+  ) : (
+    <center>Loading...</center>
+  );
+};
+
+export default ProfileForm;
+
+
+// File: ProfileForm.module.css
+
+/* ProfileForm.module.css */
+.profileForm {
+    max-width: 400px;
+    margin: auto;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    background: #fff;
+    transition: all 0.3s ease;
+}
+
+.profileForm h2 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.inputField {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    transition: border-color 0.3s ease;
+}
+
+.inputField:focus {
+    border-color: #007bff;
+    outline: none;
+}
+
+.submitButton {
+    width: 100%;
+    padding: 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.submitButton:hover {
+    background-color: #0056b3;
+}
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.profileForm {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+
+// File: index.css
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+    margin: 0;
+    padding: 0;
+    font-family: Assistant, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    box-sizing: border-box;
+}
+
+header {
+    display: flex;
+    background-color: #ffffff;
+    height: 80px;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 0px solid #b6b1b1;
+}
+
+.myntra_home {
+    height: 45px;
+}
+
+.logo_container {
+    margin-left: 4%;
+    width: 120px;
+}
+
+.action_bar {
+    margin-right: 4%;
+}
+
+.nav_bar {
+    display: flex;
+    min-width: 500px;
+    justify-content: space-evenly;
+}
+
+.nav_bar a {
+    font-size: 14px;
+    letter-spacing: .3px;
+    color: #282c3f;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-decoration: none;
+    padding: 28px 0;
+    border-bottom: 5px solid #ffffff;
+}
+
+.nav_bar a:hover {
+    border-bottom: 4px solid #f54e77;
+}
+
+.nav_bar a sup {
+    color: #ff3f6c;
+    font-size: 10px;
+}
+
+.search_bar {
+    height: 40px;
+    min-width: 200px;
+    width: 30%;
+    display: flex;
+    align-items: center;
+}
+
+.search_icon {
+    box-sizing: content-box;
+    height: 20px;
+    padding: 10px;
+
+    background-color: #f5f5f6;
+    color: #282c3f;
+    font-weight: 300;
+    border-radius: 4px 0 0 4px;
+}
+
+.search_input {
+    color: #696e79;
+    background-color: #f5f5f6;
+    flex-grow: 1;
+    height: 40px;
+    border: 0;
+    border-radius: 0 4px 4px 0;
+}
+
+.action_bar {
+    display: flex;
+    min-width: 200px;
+    justify-content: space-evenly;
+}
+
+.action_container {
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Main section */
+.banner_container {
+    margin: 40px 0;
+}
+
+.banner_image {
+    width: 100%;
+}
+
+.category_heading {
+    text-transform: uppercase;
+    color: #3e4152;
+    letter-spacing: .15em;
+    font-size: 1.8em;
+    margin: 50px 0 10px 30px;
+    max-height: 5em;
+    font-weight: 700;
+}
+
+.category-items, .items-container {
+    width: 80%;
+    margin: 50px 10%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-evenly;
+}
+
+.sale_item {
+    width: 250px;
+}
+
+.footer_container {
+    padding: 30px 0px 40px 0px;
+    background: #FAFBFC;
+    display: flex;
+    justify-content: space-evenly;
+}
+
+.footer_column {
+    display: flex;
+    flex-direction: column;
+}
+
+.footer_column h3 {
+    color: #282c3f;
+    font-size: 14px;
+    margin-bottom: 25px;
+}
+
+.footer_column a {
+    color: #696b79;
+    font-size: 15px;
+    text-decoration: none;
+    padding-bottom: 5px;
+}
+
+.copyright {
+    color: #94969f;
+    text-align: end;
+    padding: 15px;
+}
+
+/*.items-container {*/
+/*    width: 80%;*/
+/*    margin: 40px 10%;*/
+/*}*/
+
+/*.item-container {*/
+/*    width: 250px;*/
+/*    margin: 10px;*/
+/*}*/
+
+/*.item-image {*/
+/*    width: 100%;*/
+/*}*/
+
+/*.rating {*/
+/*    font-size: 12px;*/
+/*    font-weight: 700;*/
+/*}*/
+
+/*.company-name {*/
+/*    margin-top: 15px;*/
+/*    font-size: 16px;*/
+/*    font-weight: 700;*/
+/*    line-height: 1;*/
+/*    color: #282c3f;*/
+/*    margin-bottom: 6px;*/
+/*    overflow: hidden;*/
+/*    text-overflow: ellipsis;*/
+/*    white-space: nowrap;*/
+/*}*/
+
+/*.item-name {*/
+/*    color: #535766;*/
+/*    font-size: 14px;*/
+/*    line-height: 1;*/
+/*    margin-bottom: 0;*/
+/*    margin-top: 0;*/
+/*    overflow: hidden;*/
+/*    text-overflow: ellipsis;*/
+/*    white-space: nowrap;*/
+/*    font-weight: 400;*/
+/*    display: block;*/
+/*}*/
+
+/*.price {*/
+/*    margin-top: 10px;*/
+/*    font-size: 14px;*/
+/*    line-height: 15px;*/
+/*    color: #282c3f;*/
+/*    white-space: nowrap;*/
+/*}*/
+
+/*.current-price {*/
+/*    font-size: 14px;*/
+/*    font-weight: 700;*/
+/*    color: #282c3f;*/
+/*}*/
+
+/*.original-price {*/
+/*    text-decoration: line-through;*/
+/*    color: #7e818c;*/
+/*    font-weight: 400;*/
+/*    margin-left: 5px;*/
+/*    font-size: 12px;*/
+/*}*/
+
+/*.discount {*/
+/*    color: #ff905a;*/
+/*    font-weight: 400;*/
+/*    font-size: 12px;*/
+/*    margin-left: 5px;*/
+/*}*/
+
+/*.btn-add-bag {*/
+/*    margin-top: 8px;*/
+/*    font-size: 18px;*/
+/*    width: 100%;*/
+/*    background-color: lightgreen;*/
+/*    border: none;*/
+/*    padding: 5px 15px;*/
+/*    border-radius: 10px;*/
+/*    cursor: pointer;*/
+/*}*/
+
+.bag-item-count {
+    background-color: #f16565;
+    white-space: nowrap;
+    text-align: center;
+    line-height: 18px;
+    padding: 0 6px;
+    height: 18px;
+    position: relative;
+    border-radius: 50%;
+    font-size: 12px;
+    color: #fff;
+    left: 13px;
+    top: -44px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.action_container {
+    text-decoration: none;
+}
+
+a.action_container:link {
+    color: black;
+}
+
+.bag-items-container {
+    display: inline-block;
+    width: 64%;
+    padding-right: 20px;
+    border-right: 1px solid #eaeaec;
+    padding-top: 32px;
+    color: #282c3f;
+    font-size: 13px;
+    line-height: 1.42857143;
+}
+
+.bag-page {
+    width: 75%;
+    margin-left: 12.5%;
+}
+
+.bag-summary {
+    vertical-align: top;
+    display: inline-block;
+    width: 35%;
+    padding: 24px 0 0 16px;
+    color: #282c3f;
+    font-size: 13px;
+    line-height: 1.42857143;
+}
+
+.bag-details-container {
+    margin-bottom: 16px;
+}
+
+.price-header {
+    font-size: 12px;
+    font-weight: 700;
+    margin: 24px 0 16px;
+    color: #535766;
+}
+
+.price-item {
+    margin-bottom: 12px;
+    line-height: 16px;
+    font-size: 14px;
+    color: #282c3f;
+}
+
+.price-item-value {
+    float: right;
+}
+
+.priceDetail-base-discount {
+    color: #03a685;
+}
+
+.price-footer {
+    font-weight: 700;
+    font-size: 15px;
+    padding-top: 16px;
+    border-top: 1px solid #eaeaec;
+    color: #3e4152;
+    line-height: 16px;
+}
+
+.btn-place-order {
+    width: 100%;
+    letter-spacing: 1px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 2px;
+    border-width: 0px;
+    padding: 10px 16px;
+    background-color: rgb(255, 63, 108);
+    color: rgb(255, 255, 255);
+    cursor: pointer;
+}
+.spinner {
+    margin: 100px 0px;
+}
+
+
+// File: main.jsx
+
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import App from "./routes/App.jsx";
+import "./index.css";
+import "bootstrap/dist/css/bootstrap.min.css";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import Bag from "./pages/Bag.jsx";
+import Home from "./pages/Home.jsx";
+import { Provider } from "react-redux";
+import myntraStore from "./store/index.js";
+import Signup from "./components/auth/Signup.jsx";
+import LoginForm from "./components/auth/LoginForm.jsx";
+import ProductForm from "./components/admin/ProductForm.jsx";
+import CategoryForm from "./components/admin/CategoryForm.jsx";
+import InventoryForm from "./components/admin/InventoryForm.jsx";
+import PrivateRoute from "./routes/PrivateRoute.jsx";
+import AdminDashboard from "./components/admin/AdminDashboard.jsx";
+import ImageUploadForm from "./components/admin/ImageUploadForm.jsx";
+import ProductPage from "./components/product/ProductPage.jsx";
+import "react-responsive-carousel/lib/styles/carousel.min.css";
+import SizeColorForm from "./components/product/SizeColorForm.jsx";
+import ProfileForm from "./components/profile/ProfileForm.jsx";
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <App />,
+    children: [
+      { path: "/", element: <Home /> },
+      { path: "/bag", element: <Bag /> },
+      { path: "/signup", element: <Signup /> },
+      { path: "/login", element: <LoginForm /> },
+
+      //Admin-specific routes protected by role
+      {
+        path: "/admin-dashboard",
+        element: (
+          <PrivateRoute requireRole="ADMIN">
+            <AdminDashboard />
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "/product-form",
+        element: (
+          <PrivateRoute requireRole={"ADMIN"}>
+            <ProductForm />
+          </PrivateRoute>
+        ),
+      },
+
+      {
+        path: "/category-form",
+        element: (
+          <PrivateRoute requireRole={"ADMIN"}>
+            <CategoryForm />
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "/inventory-form",
+        element: (
+          <PrivateRoute requireRole={"ADMIN"}>
+            <InventoryForm />
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "/upload-image/:id",
+        element: (
+          <PrivateRoute requireRole={"ADMIN"}>
+            <ImageUploadForm />
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "/product/:id",
+        element: <ProductPage />,
+      },
+      {
+        path: "/size-color-form/:id",
+        element: <SizeColorForm />,
+      },
+      {
+        path: "/profile-form",
+        element: <ProfileForm />,
+      },
+    ],
+  },
+]);
+
+createRoot(document.getElementById("root")).render(
+  <StrictMode>
+    <Provider store={myntraStore}>
+      <RouterProvider router={router} />
+    </Provider>
+  </StrictMode>
+);
+
+
+// File: Bag.jsx
+
+import React, { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import BagSummary from "../components/bag/BagSummary.jsx";
+import BagItem from "../components/bag/BagItem.jsx";
+import { fetchCart } from "../store/slices/bagSlice.js";
+
+export default function Bag() {
+  const dispatch = useDispatch();
+  const user = useSelector((state) => state.auth.user);
+  const userId = user?.id || 1; // Use 1 as default if user id is not available
+  const bagState = useSelector((state) => state.bag);
+  const items = bagState?.items || [];
+  const status = bagState?.status || 'idle';
+  const error = bagState?.error || null;
+
+  useEffect(() => {
+    dispatch(fetchCart(userId));
+  }, [dispatch, userId]);
+
+  if (status === 'loading') return <div>Loading...</div>;
+  if (status === 'failed') return <div>Error: {error}</div>;
+
+  return (
+    <main>
+      <div className="bag-page">
+        <div className="bag-items-container">
+          {items.map((item) => (
+            <BagItem key={item.id} item={item.product} cartProductId={item.id} quantity={item.quantity} />
+          ))}
+        </div>
+        <BagSummary />
+      </div>
+    </main>
+  );
+}
+
+
+// File: Home.jsx
+
+import React, { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchHomeItems } from '../store/slices/itemsSlice';
+import HomeItem from '../components/home/HomeItem.jsx';
+
+const Home = () => {
+  const dispatch = useDispatch();
+  const itemsState = useSelector(state => state.items);
+
+  useEffect(() => {
+    if (itemsState.status === 'idle') {
+      dispatch(fetchHomeItems());
+    }
+  }, [itemsState.status, dispatch]);
+
+  if (itemsState.status === 'loading') {
+    return <div>Loading...</div>;
+  }
+
+  if (itemsState.status === 'failed') {
+    return <div>Error: {itemsState.error}</div>;
+  }
+
+  return (
+    <div>
+      {itemsState.items && itemsState.items.map(item => (
+        <HomeItem key={item.id} item={item} />
+      ))}
+    </div>
+  );
+};
+
+export default Home;
+
+
+// File: App.jsx
+
+import Header from "../components/header/Header.jsx";
+import Footer from "../components/common/Footer.jsx";
+import { Outlet } from "react-router-dom";
+import FetchItems from "../components/common/Fetchitems.jsx";
+import { useSelector } from "react-redux";
+import Spinner from "../components/common/Spinner.jsx";
+import "bootstrap/dist/css/bootstrap.min.css";
+import { ToastContainer } from "react-toastify";
+import { useEffect } from "react";
+import {setAuthenticatedUser} from "../store/slices/authSlice.js";
+import { useDispatch } from "react-redux";
+import axiosInstance from "../utils/api.js";
+
+function App() {
+  const fetchStatus = useSelector((store) => store.fetchStatus);
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const user = JSON.parse(localStorage.getItem("user"));
+
+    if (token && user) {
+      dispatch(setAuthenticatedUser({ token, user }));
+    }
+  }, [dispatch]);
+
+  return (
+    <>
+      <Header />
+      <FetchItems />
+      {fetchStatus.currentlyFetching ? (
+        <Spinner />
+      ) : (
+        <Outlet /> // This will render the route's children, like CreateProductForm
+      )}
+      <Footer />
+      {/* Add ToastContainer here for global toasts */}
+      <ToastContainer />
+    </>
+  );
+}
+
+export default App;
+
+
+// File: PrivateRoute.jsx
+
+import React from "react";
+import { useSelector } from "react-redux";
+import { Navigate } from "react-router-dom";
+
+// PrivateRoute with Role Checking
+const PrivateRoute = ({ children, requireRole }) => {
+  const { z, user, isAuthenticated } = useSelector((state) => state.auth);
+
+  if (!isAuthenticated || user.role !== requireRole) {
+    return <Navigate to="/login" />;
+  }
+
+  // If everything is valid, render the children
+  return children;
+};
+
+export default PrivateRoute;
+
+
+// File: index.js
+
+import { configureStore } from "@reduxjs/toolkit";
+import itemsSlice from "./slices/itemsSlice.js";
+import fetchStatusSlice from "./slices/fetchStatusSlice.js";
+import bagSlice from "./slices/bagSlice.js";
+import authSlice from "./slices/authSlice.js";
+import imageSlice from "./slices/imageSlice.js";
+
+// Create Store
+const myntraStore = configureStore({
+  reducer: {
+    items: itemsSlice, // Directly using the imported slice
+    fetchStatus: fetchStatusSlice.reducer, // Directly using the imported slice
+    bag: bagSlice,
+    auth: authSlice.reducer,
+    images: imageSlice.reducer,
+  },
+});
+
+export default myntraStore;
+
+
+// File: authSlice.js
+
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import axiosInstance from "../../utils/api"
+
+export const loginUser = createAsyncThunk(
+  "auth/login",
+  async (credentials, thunkAPI) => {
+    try {
+      const response = await axiosInstance.post(
+        "/api/auth/authenticate",
+        credentials,
+      );
+
+      const { token, userDTO } = response.data;
+
+      // Store both token and userDTO in localStorage
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(userDTO));
+      return response.data;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error.response.data);
+    }
+  },
+);
+
+export const signupUser = createAsyncThunk(
+  "auth/signup",
+  async (userData, thunkAPI) => {
+    try {
+      const response = await axiosInstance.post("/api/auth/register", userData);
+      return response.data;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error.response.data);
+    }
+  },
+);
+
+export const logoutUser = createAsyncThunk("auth/logoutUser", async () => {
+  localStorage.removeItem("token");
+  window.location.href = "/login";
+});
+
+const storedUser = localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")) : {
+  firstName: "",
+  lastName: "",
+  email: "",
+  role: "",
+  addressList: [],
+  defaultPhoneNumber: "",
+};
+
+const authSlice = createSlice({
+  name: "auth",
+  initialState: {
+    user: storedUser, // Initialise user from localStorage
+    token: localStorage.getItem("token"),
+    isAuthenticated: !!localStorage.getItem("token"),
+    isLoading: false,
+    error: null,
+  },
+  reducers: {
+
+    clearError: (state) => {
+      state.error = null;
+    },
+    // Add the setAuthenticatedUser reducer
+    setAuthenticatedUser: (state, action) => {
+      state.user = action.payload.userDTO;
+      state.token = action.payload.token;
+      state.isAuthenticated = true;
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(loginUser.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(loginUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isAuthenticated = true;
+        state.user = action.payload.userDTO;
+        state.token = action.payload.token;
+        state.user.role = action.payload.userDTO.role;
+        state.error = null;
+      })
+      .addCase(loginUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(signupUser.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(signupUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.user = action.payload.userDTO;
+        state.token = action.payload.token;
+        state.error = null;
+        state.isAuthenticated = true;
+      })
+      .addCase(signupUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(logoutUser.fulfilled, (state) => {
+        state.user = {
+          firstName: "",
+          lastName: "",
+          email: "",
+          role: "",
+        };
+        state.isAuthenticated = false;
+        state.token = null;
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+      });
+  },
+});
+
+export const { clearError, setAuthenticatedUser } = authSlice.actions;
+export default authSlice;
+
+
+// File: bagSlice.js
+
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import axios from "axios"; // Make sure to install axios
+
+// Async thunks
+export const fetchCart = createAsyncThunk(
+  "bag/fetchCart",
+  async (userId, thunkAPI) => {
+    try {
+      const response = await axios.get(`http://localhost:8080/api/cart/getCartByUserId/${userId}`);
+      return response.data;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error.response.data);
+    }
+  }
+);
+
+export const addToBag = createAsyncThunk(
+  "bag/addToBag",
+  async ({ userId, productId, quantity }, thunkAPI) => {
+    try {
+      // Use URLSearchParams to send data as form data
+      const params = new URLSearchParams();
+      params.append('userId', userId);
+      params.append('productId', productId);
+      params.append('quantity', quantity);
+
+      const response = await axios.post(
+        "http://localhost:8080/api/cart",
+        params,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error adding to bag:', error);
+      return thunkAPI.rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+export const removeFromBag = createAsyncThunk(
+  "bag/removeFromBag",
+  async ({ userId, productId, quantity }, thunkAPI) => {
+    try {
+      await axios.post("/api/cart/remove", { userId, productId, quantity });
+      return productId;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error.response.data);
+    }
+  }
+);
+
+export const updateQuantity = createAsyncThunk(
+  "bag/updateQuantity",
+  async ({ userId, productId, quantity }, thunkAPI) => {
+    try {
+      const response = await axios.post("/api/cart/add", { userId, productId, quantity });
+      return response.data;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error.response.data);
+    }
+  }
+);
+
+// Slice
+const bagSlice = createSlice({
+  name: "bag",
+  initialState: {
+    items: [],
+    status: 'idle',
+    error: null
+  },
+  reducers: {},
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchCart.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(fetchCart.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        state.items = action.payload.cartProducts;
+      })
+      .addCase(fetchCart.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.error.message;
+      })
+      .addCase(addToBag.fulfilled, (state, action) => {
+        state.items.push(action.payload);
+      })
+      .addCase(removeFromBag.fulfilled, (state, action) => {
+        state.items = state.items.filter(item => item.product.id !== action.payload);
+      })
+      .addCase(updateQuantity.fulfilled, (state, action) => {
+        const index = state.items.findIndex(item => item.product.id === action.payload.product.id);
+        if (index !== -1) {
+          state.items[index] = action.payload;
+        }
+      });
+  },
+});
+
+export default bagSlice.reducer;
+
+
+// File: fetchStatusSlice.js
+
+import { createSlice } from "@reduxjs/toolkit";
+
+// Create Slice
+const fetchStatusSlice = createSlice({
+  name: "fetchStatus",
+  initialState: {
+    fetchDone: false, // false: PENDING and true: DONE
+    currentlyFetching: false,
+  },
+  reducers: {
+    markFetchDone: (state) => {
+      state.fetchDone = true; // Correctly update the state
+    },
+    markFetchingStarted: (state) => {
+      state.currentlyFetching = true; // Correctly update the state
+    },
+    markFetchingFinished: (state) => {
+      state.currentlyFetching = false; // Correctly update the state
+    },
+  },
+});
+
+export const fetchStatusActions = fetchStatusSlice.actions;
+
+export default fetchStatusSlice;
+
+
+// File: imageSlice.js
+
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+
+// Async thunk to fetch product images
+export const fetchProductImage = createAsyncThunk(
+    'images/fetchImage',
+    async (itemId) => {
+        const response = await fetch(`http://localhost:8080/api/products/${itemId}`);
+        const product = await response.json();
+        const fileName = product.imageURL;
+        const imageResponse = await fetch(`http://localhost:8080/api/s3/${fileName}`);
+        const fullImageUrl = await imageResponse.text(); // Assuming backend returns a text URL
+        return { itemId, fullImageUrl }; // Return the itemId and image URL
+    }
+);
+
+const imageSlice = createSlice({
+    name: 'images',
+    initialState: {},
+    reducers: {},
+    extraReducers: (builder) => {
+        builder.addCase(fetchProductImage.fulfilled, (state, action) => {
+            state[action.payload.itemId] = action.payload.fullImageUrl; // Store image URL by item ID
+        });
+    },
+});
+
+export default imageSlice;
+
+
+// File: itemsSlice.js
+
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+
+export const fetchHomeItems = createAsyncThunk(
+  "items/fetchHomeItems",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await fetch("http://localhost:8080/api/products");
+      if (!response.ok) throw new Error('Server Error');
+      return await response.json();
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+const itemsSlice = createSlice({
+  name: "items",
+  initialState: {
+    items: [],
+    status: 'idle',
+    error: null
+  },
+  reducers: {
+    addInitialItems: (state, action) => {
+      state.items = action.payload;
+      state.status = 'succeeded';
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchHomeItems.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(fetchHomeItems.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        state.items = action.payload;
+      })
+      .addCase(fetchHomeItems.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
+      });
+  },
+});
+
+export const { addInitialItems } = itemsSlice.actions;
+export default itemsSlice.reducer;
+
+
+// File: api.js
+
+import axios from "axios";
+
+// Create a single Axios instance
+const axiosInstance = axios.create({
+  baseURL: "http://localhost:8080", // Base URL for the API
+  headers: {
+    "Content-Type": "application/json", // Default header for FormData
+  },
+  withCredentials: true, // Ensures cookies are sent across domains if needed
+});
+
+// Add a request interceptor to include the token in headers
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
+export default axiosInstance;
+
+
+// File: toastify.js
+
+import { toast } from "react-toastify";
+
+const commonConfig = {
+    position: "top-right",
+    autoClose: 3000,
+    hideProgressBar: false,
+    closeOnClick: true,
+    pauseOnHover: true,
+    draggable: true,
+    progress: undefined,
+  };
+
+  // Success toast
+  export const showSuccessToast = (message) => {
+    toast.success(message, commonConfig);
+  };
+  export const showErrorToast = (message) => {
+    toast.error(message, commonConfig);
+  };
+  export const showInfoToast = (message) => {
+    toast.info(message, commonConfig);
+  };
+  export const showWarningToast = (message) => {
+    toast.warning(message, commonConfig);
+  };
+  export const showCustomToast = (message, options = {}) => {
+    toast(message, { ...commonConfig, ...options });
+  };
+
+
+// File: tailwind.config.js
+
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ["./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+
+
+
+// File: vite.config.js
+
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+})
+
+

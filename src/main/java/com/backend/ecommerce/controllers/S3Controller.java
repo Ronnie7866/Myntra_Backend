@@ -12,7 +12,7 @@ import java.util.List;
 @RequestMapping("/api/s3")
 public class S3Controller {
 
-    private ImageUploader uploader;
+    private final ImageUploader uploader;
 
     @Autowired
     public S3Controller(ImageUploader uploader) {

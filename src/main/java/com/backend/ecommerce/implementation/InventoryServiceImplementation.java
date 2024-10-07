@@ -78,7 +78,8 @@ public class InventoryServiceImplementation implements InventoryService {
                         .orElseThrow(() -> new ProductNotFoundException("Product not found with this id: " + productId)))
                 .orElseThrow(() -> new InventoryNotFoundException("Inventory not found"));
 
-        inventory.setQuantity(inventory.getQuantity() + quantity);
+        inventory.setQuantity(inventory.getQuantity() - 1);
+        System.out.println("Increasing stock: " + inventory.getQuantity());
         Inventory save = inventoryRepository.save(inventory);
         return inventoryMapper.apply(save);
     }
@@ -89,10 +90,8 @@ public class InventoryServiceImplementation implements InventoryService {
                         .orElseThrow(() -> new ProductNotFoundException("Product not found with this id: " + productId)))
                 .orElseThrow(() -> new InventoryNotFoundException("Inventory not found"));
 
-        if (inventory.getQuantity() < quantity) {
-            throw new InsufficientStockException("Not enough stock available");
-        }
-        inventory.setQuantity(inventory.getQuantity() - quantity);
+        inventory.setQuantity(inventory.getQuantity() + 1);
+        System.out.println("Decreasing stock: " + inventory.getQuantity());
         Inventory save = inventoryRepository.save(inventory);
         return inventoryMapper.apply(save);
     }

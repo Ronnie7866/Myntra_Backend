@@ -1,21 +1,18 @@
 package com.backend.ecommerce.config;
 
-
-import com.amazonaws.ClientConfiguration;
-import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.AWSStaticCredentialsProvider;
-import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.retry.PredefinedRetryPolicies;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 @Configuration
 public class S3Config {
 
-    @Value("${cloud.aws.credentials.access.key}")
+    @Value("${cloud.aws.credentials.access-key}")
     private String accessKey;
 
     @Value("${cloud.aws.credentials.secret-key}")
@@ -25,24 +22,22 @@ public class S3Config {
     private String region;
 
     @Bean
-    public AmazonS3 client() {
-        if (accessKey == null || secretKey == null || region == null) {
-            throw new IllegalArgumentException("AWS credentials and region must be set");
-        }
+    public S3Client s3Client() {
+        AwsBasicCredentials awsCredentials = AwsBasicCredentials.create(accessKey, secretKey);
 
-        ClientConfiguration clientConfig = new ClientConfiguration()
-                .withConnectionTimeout(5000) // 5 seconds
-                .withSocketTimeout(5000) // 5 seconds
-                .withMaxConnections(100) // Set max connections
-                .withConnectionTTL(30000) // 30 seconds
-                .withRetryPolicy(PredefinedRetryPolicies.getDefaultRetryPolicy());
+        return S3Client.builder()
+                .region(Region.of(region))
+                .credentialsProvider(StaticCredentialsProvider.create(awsCredentials))
+                .build();
+    }
 
-        AWSCredentials credentials = new BasicAWSCredentials(accessKey, secretKey);
-        return AmazonS3ClientBuilder
-                .standard()
-                .withCredentials(new AWSStaticCredentialsProvider(credentials))
-                .withRegion(region)
-                .withClientConfiguration(clientConfig)
+    @Bean
+    public S3Presigner s3Presigner() {
+        AwsBasicCredentials awsCredentials = AwsBasicCredentials.create(accessKey, secretKey);
+
+        return S3Presigner.builder()
+                .region(Region.of(region))
+                .credentialsProvider(StaticCredentialsProvider.create(awsCredentials))
                 .build();
     }
 }
