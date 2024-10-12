@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Data
@@ -73,7 +74,7 @@ public class Product {
             inverseJoinColumns = @JoinColumn(name = "category_id")
     )
     @JsonIgnore
-    private List<Category> categories = new ArrayList<>();
+    private Set<Category> categories;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private List<ProductImageTable> productImages = new ArrayList<>();

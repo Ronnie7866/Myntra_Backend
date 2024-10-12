@@ -43,9 +43,8 @@ public class ProductServiceImplementation implements ProductService {
 
     @Override
     public List<ProductDTO> addAll(List<Product> products) {         // Save all products at once
-            List<Product> savedProducts = productRepository.saveAll(products);
-            // Map the saved products to DTOs
-        Collectors Collectors;
+        List<Product> savedProducts = productRepository.saveAll(products);
+        // Map the saved products to DTOs
         return savedProducts.stream()
                 .map(productMapper::apply)
                 .toList();

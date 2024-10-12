@@ -1,7 +1,7 @@
 package com.backend.ecommerce.enums;
 
 public enum TransactionType {
-
+    STRIPE,
     IMPS,
     UPI,
     COD,

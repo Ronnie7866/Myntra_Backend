@@ -20,8 +20,9 @@ public class Address {
     @Enumerated(EnumType.STRING)
     private PhoneType phoneType;
 
-    @ManyToOne(cascade = CascadeType.ALL, fetch =  FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JsonBackReference
+    @JoinColumn(name = "user_id")
     private User user;
 
     @ManyToOne

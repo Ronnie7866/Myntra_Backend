@@ -3,6 +3,7 @@ package com.backend.ecommerce.entity;
 
 import com.backend.ecommerce.enums.AvailabilityStatus;
 import com.backend.ecommerce.enums.OrderStatus;
+import com.backend.ecommerce.enums.PaymentStatus;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
@@ -25,12 +26,6 @@ public class Order {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-//    private LocalDateTime orderDate;
-//    private LocalDateTime updatedAt;
-
-//    @Enumerated(EnumType.STRING)
-//    private AvailabilityStatus availabilityStatus;
 
     @Enumerated(EnumType.STRING)
     private OrderStatus orderStatus;
@@ -59,9 +54,8 @@ public class Order {
     @Column(name = "modifiedat", nullable = false)
     private LocalDateTime modifiedate;
 
-//    @Transient
-//    private Long userId = user.getId();
-//
-//    @Transient
-//    private Long transactionId = transaction.getId();
+    private String stripePaymentIntentId;
+
+    @Enumerated(EnumType.STRING)
+    private PaymentStatus paymentStatus;
 }

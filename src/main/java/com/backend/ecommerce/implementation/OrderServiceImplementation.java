@@ -30,8 +30,13 @@ public class OrderServiceImplementation implements OrderService {
     private final OrderProductsRepository orderProductsRepository;
     private final CartRepository cartRepository;
 
+    public Order updateOrder(Order order) {
+        return orderRepository.save(order);
+    }
+
 
     @Override
+    @Transactional
     public void createOrder(OrderRequest orderRequest) {
         // Retrieve user
         User user = userRepository.findById(orderRequest.getUserId()).orElseThrow(() -> new RuntimeException("User not found"));
@@ -44,9 +49,14 @@ public class OrderServiceImplementation implements OrderService {
         // Save order to get its ID
         order = orderRepository.save(order);
 
-        // Create OrderProducts entities and establish mappings
+        // Check inventory and create OrderProducts entities
         for (OrderProductRequest productRequest : orderRequest.getOrderProducts()) {
             Product product = productRepository.findById(productRequest.getProductId()).orElseThrow(() -> new RuntimeException("Product not found"));
+            
+            // Check inventory
+            if (product.getInventory() < productRequest.getQuantity()) {
+                throw new RuntimeException("Not enough inventory for product: " + product.getName());
+            }
 
             // Create OrderProduct entity
             OrderProducts orderProducts = new OrderProducts();
@@ -59,6 +69,10 @@ public class OrderServiceImplementation implements OrderService {
 
             // Add OrderProducts entity to order's list of order Products
             order.getOrderProducts().add(orderProducts);
+
+            // Update product inventory
+            product.setInventory(product.getInventory() - productRequest.getQuantity());
+            productRepository.save(product);
         }
 
         // update the order

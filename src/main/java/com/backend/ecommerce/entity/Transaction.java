@@ -31,9 +31,6 @@ public class Transaction {
 
     private BigDecimal transactionAmount;
 
-//    @ElementCollection
-//    private List<String> productIds = new ArrayList<>();
-
     @CreationTimestamp
     @Column(name = "createdat", nullable = false)
     private LocalDateTime createdat;

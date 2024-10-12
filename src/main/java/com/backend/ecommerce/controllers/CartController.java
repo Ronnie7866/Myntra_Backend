@@ -34,14 +34,14 @@ public class CartController {
         return ResponseEntity.ok(cartProducts);
     }
 
-    @PostMapping("/remove")
+    @DeleteMapping("/remove")
     public ResponseEntity<String> removeProductFromCart(
             @RequestParam Long userId,
-            @RequestParam Long productId,
-            @RequestParam Integer quantity
-    ) {
+            @RequestParam Long productId) {
         try {
-            cartService.removeProductFromCart(userId, productId, quantity);
+            System.out.println("Entering removeProductFromCart method in controller...");
+            cartService.removeProductFromCart(userId, productId);
+            System.out.println("going to implementation...");
             return ResponseEntity.ok("Product removed from cart successfully");
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());

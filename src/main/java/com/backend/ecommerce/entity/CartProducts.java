@@ -23,7 +23,8 @@ public class CartProducts {
     @JsonBackReference
     private Cart cart;
 
-    @OneToOne(cascade = CascadeType.ALL)
+    @ManyToOne
+    @JoinColumn(name = "product_id")
     private Product product;
 
     private Integer quantity;
@@ -38,6 +39,7 @@ public class CartProducts {
                 ", cart=" + "Cart Value Omitted" +
                 ", product=" + product +
                 ", quantity=" + quantity +
+                ", availabilityStatus=" + availabilityStatus +
                 '}';
     }
 }

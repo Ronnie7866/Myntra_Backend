@@ -360,6 +360,20 @@ public class CartController {
         return ResponseEntity.ok(cartProducts);
     }
 
+    @PostMapping("/remove")
+    public ResponseEntity<String> removeProductFromCart(
+            @RequestParam Long userId,
+            @RequestParam Long productId,
+            @RequestParam Integer quantity
+    ) {
+        try {
+            cartService.removeProductFromCart(userId, productId, quantity);
+            return ResponseEntity.ok("Product removed from cart successfully");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @GetMapping("/{cartId}")
     public ResponseEntity<Cart> getCart(@PathVariable Long cartId){
         Cart cart = cartService.getCart(cartId);
@@ -634,9 +648,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.backend.ecommerce.enums.PaymentStatus;
+
+import com.backend.ecommerce.service.StripeService;
+import com.stripe.exception.StripeException;
+import com.stripe.model.PaymentIntent;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 @RestController
@@ -646,6 +667,51 @@ public class OrderController {
 
     private final CheckoutService checkoutService;
     private final OrderServiceImplementation orderService;
+    private final StripeService stripeService;
+
+    @PostMapping("/create-payment-intent")
+    public ResponseEntity<Map<String, String>> createPaymentIntent(@RequestParam Long userId,
+                                                                   @RequestParam BigDecimal amount) {
+        try {
+            PaymentIntent paymentIntent = stripeService.createPaymentIntent(amount, "usd");
+            Map<String, String> response = new HashMap<>();
+            response.put("clientSecret", paymentIntent.getClientSecret());
+            return ResponseEntity.ok(response);
+        } catch (StripeException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
+    @PostMapping("/confirm-payment")
+    public ResponseEntity<Order> confirmPaymentAndCreateOrder(@RequestParam Long userId,
+                                                              @RequestParam String paymentIntentId,
+                                                              @RequestParam BigDecimal amount) {
+        System.out.println("Entering confirmPaymentAndCreateOrder method");
+        System.out.println("UserId: " + userId + ", PaymentIntentId: " + paymentIntentId + ", Amount: " + amount);
+        try {
+            System.out.println("Attempting to confirm payment intent");
+            PaymentIntent confirmedPaymentIntent = stripeService.confirmPaymentIntent(paymentIntentId);
+            System.out.println("Payment intent status: " + confirmedPaymentIntent.getStatus());
+            if ("succeeded".equals(confirmedPaymentIntent.getStatus())) {
+                System.out.println("Payment succeeded, creating order");
+                Order order = checkoutService.checkout(userId, TransactionType.STRIPE, amount);
+                order.setStripePaymentIntentId(confirmedPaymentIntent.getId());
+                order.setPaymentStatus(PaymentStatus.SUCCESS);
+                Order updatedOrder = orderService.updateOrder(order);
+                System.out.println("Order created and updated successfully: " + updatedOrder.getId());
+                return ResponseEntity.ok(updatedOrder);
+            } else {
+                System.out.println("Payment did not succeed. Status: " + confirmedPaymentIntent.getStatus());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+            }
+        } catch (StripeException e) {
+            System.out.println("StripeException occurred: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        } finally {
+            System.out.println("Exiting confirmPaymentAndCreateOrder method");
+        }
+    }
 
     @PostMapping("checkout")
     public Order checkout(@RequestParam Long userId,
@@ -1642,6 +1708,7 @@ package com.backend.ecommerce.entity;
 
 import com.backend.ecommerce.enums.AvailabilityStatus;
 import com.backend.ecommerce.enums.OrderStatus;
+import com.backend.ecommerce.enums.PaymentStatus;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
@@ -1664,12 +1731,6 @@ public class Order {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-//    private LocalDateTime orderDate;
-//    private LocalDateTime updatedAt;
-
-//    @Enumerated(EnumType.STRING)
-//    private AvailabilityStatus availabilityStatus;
 
     @Enumerated(EnumType.STRING)
     private OrderStatus orderStatus;
@@ -1698,11 +1759,10 @@ public class Order {
     @Column(name = "modifiedat", nullable = false)
     private LocalDateTime modifiedate;
 
-//    @Transient
-//    private Long userId = user.getId();
-//
-//    @Transient
-//    private Long transactionId = transaction.getId();
+    private String stripePaymentIntentId;
+
+    @Enumerated(EnumType.STRING)
+    private PaymentStatus paymentStatus;
 }
 
 
@@ -2269,6 +2329,17 @@ public enum OrderStatus {
 }
 
 
+// File: PaymentStatus.java
+
+package com.backend.ecommerce.enums;
+
+public enum PaymentStatus {
+    PENDING,
+    SUCCESS,
+    FAILED
+}
+
+
 // File: PhoneType.java
 
 package com.backend.ecommerce.enums;
@@ -2307,7 +2378,7 @@ public enum TransactionStatus {
 package com.backend.ecommerce.enums;
 
 public enum TransactionType {
-
+    STRIPE,
     IMPS,
     UPI,
     COD,
@@ -2789,48 +2860,34 @@ public class CartServiceImplementation implements CartService {
 //    }
 
     @Override
-    public CartProducts addProductToCart(Long userId, Long productId, Integer quantity) {
+    public CartProducts addProductToCart(Long userId, Long productId, Integer newQuantity) {
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
         Product product = productRepository.findById(productId).orElseThrow(() -> new RuntimeException("Product not found"));
 
         Cart cart = user.getCart();
-        CartProducts cartProducts;
-
-        Optional<CartProducts> existingCartItemOpt = Optional.empty();
-
-        // Check if the cart exists
-        if (cart != null) {
-            existingCartItemOpt = cartProductsRepository.findByCartIdAndProductId(cart.getId(), productId);
-        } else {
-            // Create a new cart if it doesn't exist
+        if (cart == null) {
             cart = new Cart();
             cart.setUser(user);
         }
 
-        // If the product already exists in the cart, update the quantity
-        if (existingCartItemOpt.isPresent()) {
-            cartProducts = existingCartItemOpt.get();
-            int newQuantity = cartProducts.getQuantity() + quantity;
+        Optional<CartProducts> existingCartItem = cartProductsRepository.findByCartIdAndProductId(cart.getId(), productId);
+
+        CartProducts cartProducts;
+        if (existingCartItem.isPresent()) {
+            cartProducts = existingCartItem.get();
+            // Set the quantity to the new value, not add to it
             cartProducts.setQuantity(newQuantity);
         } else {
-            // If the product is not in the cart, create a new cart item
             cartProducts = new CartProducts();
             cartProducts.setCart(cart);
             cartProducts.setProduct(product);
-            cartProducts.setQuantity(quantity);
-        }
-
-        // Decrease stock
-        try {
-            inventoryService.decreaseStock(productId, quantity);
-        } catch (InsufficientStockException | InventoryNotFoundException e) {
-            throw new RuntimeException(e);
+            cartProducts.setQuantity(newQuantity);
         }
 
         return cartProductsRepository.save(cartProducts);
     }
 
-    @Override // TODO create controller for this
+    @Override
     public void removeProductFromCart(Long userId, Long productId, Integer quantity) {
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
         Cart cart = user.getCart();
@@ -3271,7 +3328,8 @@ public class InventoryServiceImplementation implements InventoryService {
                         .orElseThrow(() -> new ProductNotFoundException("Product not found with this id: " + productId)))
                 .orElseThrow(() -> new InventoryNotFoundException("Inventory not found"));
 
-        inventory.setQuantity(inventory.getQuantity() + quantity);
+        inventory.setQuantity(inventory.getQuantity() - 1);
+        System.out.println("Increasing stock: " + inventory.getQuantity());
         Inventory save = inventoryRepository.save(inventory);
         return inventoryMapper.apply(save);
     }
@@ -3282,10 +3340,8 @@ public class InventoryServiceImplementation implements InventoryService {
                         .orElseThrow(() -> new ProductNotFoundException("Product not found with this id: " + productId)))
                 .orElseThrow(() -> new InventoryNotFoundException("Inventory not found"));
 
-        if (inventory.getQuantity() < quantity) {
-            throw new InsufficientStockException("Not enough stock available");
-        }
-        inventory.setQuantity(inventory.getQuantity() - quantity);
+        inventory.setQuantity(inventory.getQuantity() + 1);
+        System.out.println("Decreasing stock: " + inventory.getQuantity());
         Inventory save = inventoryRepository.save(inventory);
         return inventoryMapper.apply(save);
     }
@@ -3349,6 +3405,10 @@ public class OrderServiceImplementation implements OrderService {
     private final ProductRepository productRepository;
     private final OrderProductsRepository orderProductsRepository;
     private final CartRepository cartRepository;
+
+    public Order updateOrder(Order order) {
+        return orderRepository.save(order);
+    }
 
 
     @Override
@@ -6041,6 +6101,46 @@ import java.util.List;
 public interface SizeService {
     Size createSize(Size size);
     List<Size> getAllSizes();
+}
+
+
+// File: StripeService.java
+
+package com.backend.ecommerce.service;
+
+import com.stripe.Stripe;
+import com.stripe.exception.StripeException;
+import com.stripe.model.PaymentIntent;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class StripeService {
+
+    @Value("${stripe.secret.key}")
+    private String stripeSecretKey;
+
+    public PaymentIntent createPaymentIntent(BigDecimal amount, String currency) throws StripeException {
+        Stripe.apiKey = stripeSecretKey;
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("amount", amount.multiply(new BigDecimal(100)).intValue()); // Stripe expects amount in cents
+        params.put("currency", currency);
+        params.put("payment_method_types", List.of("card"));
+
+        return PaymentIntent.create(params);
+    }
+
+    public PaymentIntent confirmPaymentIntent(String paymentIntentId) throws StripeException {
+        Stripe.apiKey = stripeSecretKey;
+        PaymentIntent paymentIntent = PaymentIntent.retrieve(paymentIntentId);
+        return paymentIntent.confirm();
+    }
 }
 
 

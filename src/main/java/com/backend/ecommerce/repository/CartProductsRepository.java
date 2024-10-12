@@ -1,5 +1,6 @@
 package com.backend.ecommerce.repository;
 
+import com.backend.ecommerce.entity.Cart;
 import com.backend.ecommerce.entity.CartProducts;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.repository.query.Param;
@@ -16,4 +17,8 @@ public interface CartProductsRepository extends JpaRepository<CartProducts, Long
 
     @Transactional
     void deleteAllByCartId(Long cart_id);
+
+    Optional<CartProducts> findByCartAndProductId(Cart cart, Long productId);
+
+    boolean existsByCartAndProductId(Cart cart, Long productId);
 }

@@ -31,16 +31,11 @@ public class Cart {
     @JsonManagedReference
     private List<CartProducts> cartProducts = new ArrayList<>();
 
-//    @ManyToOne
-//    @JoinColumn(name = "buyer_id")
-//    private Buyer buyer;
-
-
     @Override
     public String toString() {
         return "Cart{" +
                 "id=" + id +
-                ", user=" + user.getId() +
+                ", user=" + (user != null ? user.getId() : "null") +
                 ", cartProducts=" + " cartProducts value omitted " +
                 '}';
     }

@@ -1,16 +1,18 @@
 package com.backend.ecommerce.implementation;
 
-import com.backend.ecommerce.exception.InsufficientStockException;
-import com.backend.ecommerce.exception.InventoryNotFoundException;
+import com.backend.ecommerce.dto.CartItemsDTO;
+import com.backend.ecommerce.entity.Cart;
+import com.backend.ecommerce.entity.CartProducts;
+import com.backend.ecommerce.entity.Product;
+import com.backend.ecommerce.entity.User;
+import com.backend.ecommerce.exception.ResourceNotFoundException;
 import com.backend.ecommerce.records.CartDTO;
-import com.backend.ecommerce.entity.*;
 import com.backend.ecommerce.repository.CartProductsRepository;
 import com.backend.ecommerce.repository.CartRepository;
 import com.backend.ecommerce.repository.ProductRepository;
 import com.backend.ecommerce.repository.UserRepository;
-import com.backend.ecommerce.dto.CartItemsDTO;
 import com.backend.ecommerce.service.CartService;
-import com.backend.ecommerce.service.InventoryService;
+import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,9 +29,9 @@ public class CartServiceImplementation implements CartService {
     private CartRepository cartRepository;
     private ProductRepository productRepository;
     private CartProductsRepository cartProductsRepository;
-    private final InventoryService inventoryService;
 
-    /** The following code either creates a new cart with new cartItem
+    /**
+     * The following code either creates a new cart with new cartItem
      * or creates a new cartItem in the cart, if product was not already in the cart
      * or updates the quantity of the product if it was already present in the cart
      **/
@@ -80,7 +82,6 @@ public class CartServiceImplementation implements CartService {
 //
 //        return cartProductsRepository.save(cartProducts);
 //    }
-
     @Override
     public CartProducts addProductToCart(Long userId, Long productId, Integer newQuantity) {
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
@@ -90,6 +91,9 @@ public class CartServiceImplementation implements CartService {
         if (cart == null) {
             cart = new Cart();
             cart.setUser(user);
+            cart = cartRepository.save(cart); // Save the new cart to the database
+            user.setCart(cart); // Update the user's cart reference
+            userRepository.save(user); // Save the updated user
         }
 
         Optional<CartProducts> existingCartItem = cartProductsRepository.findByCartIdAndProductId(cart.getId(), productId);
@@ -109,35 +113,22 @@ public class CartServiceImplementation implements CartService {
         return cartProductsRepository.save(cartProducts);
     }
 
-    @Override
-    public void removeProductFromCart(Long userId, Long productId, Integer quantity) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
-        Cart cart = user.getCart();
+    @Transactional
+    public void removeProductFromCart(Long userId, Long productId) {
+            Cart cart = cartRepository.findByUserId(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Cart not found for user with id: " + userId));
 
-        if (cart == null) {
-            throw new RuntimeException("Cart not found");
-        }
+            CartProducts cartProduct = cart.getCartProducts().stream()
+                    .filter(cp -> cp.getProduct().getId().equals(productId))
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found in cart"));
 
-        CartProducts cartProducts = cartProductsRepository.findByCartIdAndProductId(cart.getId(), productId)
-                .orElseThrow(() -> new RuntimeException("Product not found in cart"));
+            // Remove the CartProduct from the Cart's set
+            cart.getCartProducts().remove(cartProduct);
 
-        int newQuantity = cartProducts.getQuantity() - quantity;
-
-        if (newQuantity <= 0) {
-            cartProductsRepository.delete(cartProducts);
-        } else {
-            cartProducts.setQuantity(newQuantity);
-            cartProductsRepository.save(cartProducts);
-        }
-
-        // Increase stock
-        try {
-            inventoryService.increaseStock(productId, quantity);
-        } catch (InventoryNotFoundException e) {
-            throw new RuntimeException(e);
-        }
+            // This should trigger the deletion due to orphanRemoval = true
+            cartRepository.save(cart);
     }
-
 
     @Override
     public List<Cart> getAllCarts() {
@@ -152,7 +143,7 @@ public class CartServiceImplementation implements CartService {
     @Override
     public List<CartItemsDTO> getCartItemsByUserId(Long userId) {
         Optional<Cart> cartOpt = cartRepository.findByUserId(userId);
-        if(cartOpt.isEmpty()) {
+        if (cartOpt.isEmpty()) {
             throw new RuntimeException("Not Present");
         }
         Long cartId = cartOpt.get().getId();
@@ -164,11 +155,10 @@ public class CartServiceImplementation implements CartService {
     @Override
     public CartDTO getCartByUserId(Long userId) { // TODO when creating new user the new user gets the old cart fix this
         Optional<Cart> cartOpt = cartRepository.findByUserId(userId);
-            if(cartOpt.isEmpty()) {
-                throw new RuntimeException("Not Present");
-            } else {
-                return convertToDTO(cartOpt.get());
-            }
+        if (cartOpt.isEmpty()) {
+            throw new RuntimeException("Not Present");
+        } else {
+            return convertToDTO(cartOpt.get());
         }
-
+    }
 }

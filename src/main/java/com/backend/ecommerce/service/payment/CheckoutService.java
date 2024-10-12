@@ -35,19 +35,14 @@ public class CheckoutService {
 
     @Transactional
     public Order checkout(Long userId, TransactionType transactionType, BigDecimal transactionAmount) {
-        System.out.println("Fetching user with ID: " + userId);
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User Not Found"));
-        System.out.println("User found: " + user);
 
-        System.out.println("Fetching cart with ID: " + user.getCart().getId());
         Cart cart = cartRepository.findById(user.getCart().getId()).orElseThrow(() -> new RuntimeException("Cart Not Found"));
-        System.out.println("Cart found: " + cart);
 
         List<CartProducts> cartProducts = cart.getCartProducts();
         if (cartProducts.isEmpty()) {
             throw new RuntimeException("Cart is empty");
         }
-        System.out.println("Cart products found: " + cartProducts);
 
         List<OrderProducts> orderProducts = cartProducts.stream().map(cartProduct -> {
             OrderProducts orderProduct = new OrderProducts();
@@ -67,23 +62,14 @@ public class CheckoutService {
         transaction.setUser(user);
         transaction.setOrder(order);
 
-//        PaymentStrategy paymentStrategy = paymentContext.getPaymentStrategy(transactionType);
-//        boolean isPaymentSuccessful = paymentStrategy.processPayment(user, transactionAmount);
-//        if (!isPaymentSuccessful) {
-//            throw new RuntimeException("Payment Failed");
-//        }
-
         transaction.setTransactionStatus(TransactionStatus.COMPLETED);
 
         orderRepository.save(order);
-        System.out.println("Order saved: " + order);
 
         transactionRepository.save(transaction);
-        System.out.println("Transaction saved: " + transaction);
 
         order.setTransaction(transaction);
         orderRepository.save(order);
-        System.out.println("Order updated with transaction: " + order);
 
         for (OrderProducts orderProduct : orderProducts) {
             orderProduct.setOrder(order);
@@ -91,8 +77,6 @@ public class CheckoutService {
 
         cartProductsRepository.deleteAll(cartProducts);
         cartRepository.deleteByUserId(userId);
-        System.out.println("Cart deleted");
-
         return order;
     }
 }
