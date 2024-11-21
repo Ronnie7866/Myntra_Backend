@@ -114,19 +114,10 @@ public class CartServiceImplementation implements CartService {
     }
 
     @Transactional
-    public void removeProductFromCart(Long userId, Long productId) {
+    public void removeProductFromCart(Long userId) {
             Cart cart = cartRepository.findByUserId(userId)
                     .orElseThrow(() -> new ResourceNotFoundException("Cart not found for user with id: " + userId));
-
-            CartProducts cartProduct = cart.getCartProducts().stream()
-                    .filter(cp -> cp.getProduct().getId().equals(productId))
-                    .findFirst()
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found in cart"));
-
-            // Remove the CartProduct from the Cart's set
-            cart.getCartProducts().remove(cartProduct);
-
-            // This should trigger the deletion due to orphanRemoval = true
+            cart.getCartProducts().clear();
             cartRepository.save(cart);
     }
 

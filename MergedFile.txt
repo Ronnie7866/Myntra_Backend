@@ -1,0 +1,3346 @@
+# ---- Start of bot.py ----
+import asyncio
+import traceback
+
+from telethon import Button
+from telethon.sync import TelegramClient, events
+from telethon.tl.custom.message import Message
+from telethon.tl.types import UpdateNewMessage
+
+from config import (ADMINS, API_HASH, API_ID, BOT_TOKEN, FORCE_LINK, GROUP_LINK)
+from logger_config import setup_logger
+from main import download_manager
+from redis_db import db
+from send_media import VideoSender
+from tools import remove_all_videos, check_force_sub
+
+# Setup logger
+log = setup_logger('terabox_bot')
+
+bot = TelegramClient("bot", API_ID, API_HASH)
+
+
+@bot.on(events.NewMessage(pattern="/start", func=lambda x: x.is_private))
+async def start_command(event):
+    try:
+        log.info(f"Start command received from user {event.sender_id}")
+
+        is_subscribed = await check_force_sub(bot, event.sender_id, FORCE_LINK, GROUP_LINK)
+
+        if not is_subscribed:
+            log.warning(f"User {event.sender_id} not subscribed to force channel")
+            buttons = [
+                [Button.url("Join Channel 📢", FORCE_LINK)],
+                [Button.inline("✅ Check Subscription", "check_sub")]
+            ]
+            await event.reply(
+                "**You must join our channel to use this bot!**\n\n"
+                "Click the button below to join, then click 'Check Subscription'",
+                buttons=buttons
+            )
+            return
+
+        log.info(f"User {event.sender_id} successfully passed subscription check")
+        await event.reply("Welcome! You can now use the bot.")
+
+    except Exception as e:
+        log.error(f"Error in start command: {str(e)}")
+        log.debug(traceback.format_exc())
+
+
+@bot.on(
+    events.NewMessage(
+        pattern="/start (?!token_)([0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12})",
+        incoming=True,
+        outgoing=False,
+        func=lambda x: x.is_private,
+    )
+)
+async def start_ntoken(m: Message):
+    try:
+        log.info(f"Start token command received from user {m.sender_id}")
+        text = m.pattern_match.group(1)
+        fileid = db.get_key(str(text))
+
+        if fileid:
+            log.info(f"Found file ID {fileid} for token {text}")
+            return await VideoSender.forward_file(
+                file_id=fileid, message=m, client=bot, uid=text.strip()
+            )
+        else:
+            log.warning(f"No file found for token {text}")
+            return await m.reply("Your requested file is not available.")
+
+    except Exception as e:
+        log.error(f"Error in start token command: {str(e)}")
+        log.debug(traceback.format_exc())
+
+
+@bot.on(
+    events.NewMessage(
+        pattern="/remove (.*)",
+        incoming=True,
+        outgoing=False,
+        from_users=ADMINS,
+    )
+)
+async def remove(m: UpdateNewMessage):
+    try:
+        user_id = m.pattern_match.group(1)
+        log.info(f"Admin attempting to remove user {user_id}")
+
+        if db.get(f"check_{user_id}"):
+            db.delete(f"check_{user_id}")
+            log.info(f"Successfully removed {user_id} from the list")
+            await m.reply(f"Removed {user_id} from the list.")
+        else:
+            log.warning(f"User {user_id} not found in the list")
+            await m.reply(f"{user_id} is not in the list.")
+
+    except Exception as e:
+        log.error(f"Error in remove command: {str(e)}")
+        log.debug(traceback.format_exc())
+
+
+@bot.on(
+    events.NewMessage(
+        pattern="/removeall",
+        incoming=True,
+        outgoing=False,
+        from_users=ADMINS,
+    )
+)
+async def removeall(m: UpdateNewMessage):
+    try:
+        log.info("Admin triggered remove all videos")
+        remove_all_videos()
+        log.info("All videos removed successfully")
+        return await m.reply("Removed all videos from the list.")
+
+    except Exception as e:
+        log.error(f"Error in removeall command: {str(e)}")
+        log.debug(traceback.format_exc())
+
+@bot.on(events.NewMessage(pattern=r"^/status$", from_users=ADMINS))
+async def bot_status(event):
+    try:
+        # Check Redis connection health
+        redis_health = "Connected" if db.ping() else "Disconnected"
+
+        # Get Redis memory stats
+        redis_info = db.info()
+        memory_usage = redis_info.get("used_memory_human", "N/A")
+        total_keys = len(db.keys())
+
+        # Get active downloads
+        active_count = len(download_manager.active_downloads)
+        queued_count = len(download_manager.download_queue)
+
+        # Generate status message
+        status_message = (
+            f"**Bot Health:**\n"
+            f"- Redis: {redis_health}\n"
+            f"- Memory Usage: {memory_usage}\n"
+            f"- Total Cached Keys: {total_keys}\n\n"
+            f"**Downloads:**\n"
+            f"- Active Downloads: {active_count}\n"
+            f"- Queued Downloads: {queued_count}\n\n"
+            f"**Active Users:**\n"
+        )
+
+        for user_id in download_manager.active_downloads.keys():
+            status_message += f"- User ID: {user_id}\n"
+
+        await event.reply(status_message)
+    except Exception as e:
+        log.error(f"Error fetching bot status: {str(e)}")
+        await event.reply("❌ Failed to fetch bot status.")
+
+@bot.on(events.NewMessage(pattern=r"^/active_downloads$", from_users=ADMINS))
+async def active_downloads_status(event):
+    try:
+        active_count = len(download_manager.active_downloads)
+        queued_count = len(download_manager.download_queue)
+
+        # Build active downloads message
+        message = f"**Active Downloads:** {active_count}\n"
+        for user_id, task in download_manager.active_downloads.items():
+            message += f"- User ID: {user_id}\n"
+
+        message += f"\n**Queued Downloads:** {queued_count}\n"
+        for queued_user, _ in download_manager.download_queue:
+            message += f"- User ID: {queued_user}\n"
+
+        await event.reply(message)
+    except Exception as e:
+        log.error(f"Error fetching active downloads: {str(e)}")
+        await event.reply("❌ Failed to fetch active downloads.")
+
+
+@bot.on(events.NewMessage(pattern=r"^/test_queue$", from_users=ADMINS))
+async def test_queue(event):
+    try:
+        log.info(f"Simulating multiple users for queue testing")
+
+        # Simulate multiple user IDs
+        for user_id in range(1001, 1011):  # Simulates 10 users with IDs 1001-1010
+            await event.reply(f"Simulating user {user_id} request.")
+            # Simulate adding a download request
+            success = await download_manager.add_download(user_id, fake_download_task(user_id))
+            if success == "queued":
+                await event.reply(f"User {user_id} was queued.")
+            elif success:
+                await event.reply(f"User {user_id}'s download started.")
+            else:
+                await event.reply(f"User {user_id} already has an active download.")
+
+    except Exception as e:
+        log.error(f"Error simulating queue: {str(e)}")
+        await event.reply("❌ Failed to simulate the queue.")
+
+
+# A simple fake download task for simulation purposes
+async def fake_download_task(user_id):
+    log.info(f"Starting fake download for user {user_id}")
+    await asyncio.sleep(10)  # Simulate download time
+    log.info(f"Fake download complete for user {user_id}")
+
+
+@bot.on(events.NewMessage(pattern=r"^/check_queue$", from_users=ADMINS))
+async def check_queue_status(event):
+    try:
+        active_count = len(download_manager.active_downloads)
+        queued_count = len(download_manager.download_queue)
+
+        # Display queue status
+        status_message = (
+            f"**Queue Status:**\n"
+            f"- Active Downloads: {active_count}\n"
+            f"- Queued Downloads: {queued_count}\n"
+        )
+        await event.reply(status_message)
+    except Exception as e:
+        log.error(f"Error checking queue status: {str(e)}")
+        await event.reply("❌ Failed to check queue status.")
+
+
+# Bot startup
+# log.info("Starting Terabox Bot")
+# bot.start(bot_token=BOT_TOKEN)
+# log.info("Bot started successfully")
+# bot.run_until_disconnected()
+
+# ---- End of bot.py ----
+
+# ---- Start of cache_manager.py ----
+# cache_manager.py
+
+import asyncio
+import logging
+from telethon import TelegramClient
+from telethon.tl.functions.channels import GetMessagesRequest
+from redis_db import db
+from config import PRIVATE_CHAT_ID
+from logger_config import setup_logger
+
+log = setup_logger('cache_manager')
+
+
+class CacheManager:
+    def __init__(self, client: TelegramClient):
+        self.client = client
+        self.cleanup_interval = 3600  # 1 hour
+        self._running = True
+
+    async def verify_cached_file(self, file_id: int) -> bool:
+        try:
+            if not file_id or not str(file_id).isdigit():
+                return False
+
+            result = await self.client(
+                GetMessagesRequest(channel=PRIVATE_CHAT_ID, id=[int(file_id)])
+            )
+            return bool(result and result.messages and result.messages[0].media)
+        except Exception as e:
+            log.error(f"Error verifying cached file {file_id}: {str(e)}")
+            return False
+
+    async def cleanup_stale_cache(self):
+        try:
+            log.info("Starting cache cleanup")
+            keys_to_delete = set()
+
+            # Get all keys that look like file IDs
+            for key in db.scan_iter("*"):
+                value = db.get(key)
+                if not value:
+                    continue
+
+                if str(value).isdigit():
+                    try:
+                        if not await self.verify_cached_file(int(value)):
+                            keys_to_delete.add(key)
+                            keys_to_delete.add(f"mid_{value}")
+                    except Exception as e:
+                        log.error(f"Error checking key {key}: {str(e)}")
+                        keys_to_delete.add(key)
+
+            # Batch delete invalid keys
+            for key in keys_to_delete:
+                try:
+                    db.delete(key)
+                    log.info(f"Deleted stale cache key: {key}")
+                except Exception as e:
+                    log.error(f"Error deleting key {key}: {str(e)}")
+
+            log.info(f"Cache cleanup completed. Removed {len(keys_to_delete)} stale entries")
+
+        except Exception as e:
+            log.error(f"Error in cache cleanup: {str(e)}")
+
+    async def start_cleanup_task(self):
+        while self._running:
+            try:
+                await self.cleanup_stale_cache()
+                await asyncio.sleep(self.cleanup_interval)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                log.error(f"Error in cleanup task: {str(e)}")
+                await asyncio.sleep(60)  # Wait a bit before retrying
+
+    def stop(self):
+        self._running = False
+
+# ---- End of cache_manager.py ----
+
+# ---- Start of cansend.py ----
+import time
+
+
+class CanSend:
+    def can_send(self):
+        if not hasattr(self, "last_send_time"):
+            self.last_send_time = time.time() - 20
+        current_time = time.time()
+        elapsed_time = current_time - self.last_send_time
+
+        if elapsed_time >= 5:
+            self.last_send_time = current_time
+            return True
+        else:
+            return False
+
+
+# ---- End of cansend.py ----
+
+# ---- Start of config.py ----
+# API_ID = 24293917  # api id
+# API_HASH = "bb0b58e35b5f3999e53077ab4ea098b7"  # api hash
+
+API_ID = 22077446  # api id
+API_HASH = "0527c89278635af66b9fef52b2314a6a"  # api hash
+
+# BOT_TOKEN = "7715788041:AAHivxUeO9se97Rm8RAHK5CcvKQyAcar8vY"  # bot token
+BOT_TOKEN = "7733315589:AAH3FAqe3lvE0oTNUTDQcCMlL1DLWv3vNXk"  # bot token
+
+
+# REDIS
+HOST = "localhost"  # redis host uri
+PORT = 6379  # redis port
+PASSWORD = ""  # redis password
+
+PRIVATE_CHAT_ID = -1002319496630  # CHAT WHERE YOU WANT TO STORE VIDEOS
+# COOKIE FOR AUTHENTICATION (get from chrome dev tools) ex: "PANWEB=1; csrfToken=;
+COOKIE = "ndut_fmt=FA02F135535ED506EB32DDDAE64837C6527EB03D1E0392B9ED6AA2E7135E26F8; TSID=Cb4i5q0bPhDsI0AbnJw6G20FLHUer2YP; ndus=Yzwct3HteHuiEIzp4-NtnfdoaQYai8tLwGcy_-W3; csrfToken=krWwkLzZh2Z1qsBEm4zeMhF6; _ga=GA1.1.1072354667.1728643712; _ga_06ZNKL8C2E=GS1.1.1730710017.15.1.1730710156.57.0.0; __bid_n=1927b31c34097b2ba54207; ab_sr=1.0.1_ZWI1YzU5ZTNmOTI3OTY0Yzc1NzNkYzJkOTlkNzE2NjQxZWQxZTU0NDg3NjU5Mzk4NDAzZDFlM2NmNTVhNDlmM2E0NDgxMDIwYmU5NjExNzlhMzczZWY2MmRiNmMxNGQxZDQ2ZDQzNTNiZmYxMTYzOTg3ZTNmODZjZjQyNDVkZjE3N2QxZjJhODdiYzg2Y2JjZDI1MGM5MTM2NDg4YjZhNQ==; browserid=hOm1kDJ7IQ9wZ7YLXoMYyTdNSzv-HT31z8sYLy8bkr-lUxNu91uS8KbnkESq6BseomjByqvNOT-WrEoY; lang=en";
+ADMINS = [5911372021]
+
+
+BOT_USERNAME = "ronnie007bot"
+
+# Force user to join this channel. (make sure you have promoted the bot on this chat.)
+FORCE_LINK = "https://t.me/terabox_downloader_by_ronnie"
+GROUP_LINK = "https://t.me/RonniesVerse"
+PUBLIC_EARN_API = ""  # https://publicearn.com/api
+
+
+# ---- End of config.py ----
+
+# ---- Start of download_manager.py ----
+import asyncio
+from typing import Dict
+from logger_config import setup_logger
+from collections import deque
+
+log = setup_logger('download')
+
+
+class DownloadManager:
+    def __init__(self):
+        self.active_downloads: Dict[int, asyncio.Task] = {}
+        self.download_queue : deque = deque()
+        self.max_active_downloads = 20
+        
+    async def add_download(self, user_id: int, download_coroutine):
+        """Add a new download task for a user"""
+        try:
+            if user_id in self.active_downloads:
+                if not self.active_downloads[user_id].done():
+                    log.info(f"User {user_id} already has an active download")
+                    return False
+            if len(self.active_downloads) >= self.max_active_downloads:
+                log.info(f"Download queue is full; adding user {user_id} to the queue")
+                self.download_queue.append((user_id, download_coroutine))
+                return "queued"
+
+            # Create new download task
+            task = asyncio.create_task(download_coroutine)
+            self.active_downloads[user_id] = task
+            log.info(f"Added new download task for user {user_id}")
+            task.add_done_callback(lambda _:self._download_complete(user_id))
+            return True
+        except Exception as e:
+            log.error(f"Error adding download for user {user_id}: {str(e)}")
+            return False
+
+    def _download_complete(self, user_id: int):
+        """Handle cleanup after a download finishes"""
+        log.info(f"Download completed for user {user_id}")
+        self.active_downloads.pop(user_id, None)
+
+        # Start the next download in the queue
+        if self.download_queue:
+            next_user, next_task = self.download_queue.popleft()
+            log.info(f"Starting download for queued user {next_user}")
+            asyncio.create_task(self.add_download(next_user, next_task))
+
+
+    def get_active_download(self, user_id: int):
+        """Get active download task for a user"""
+        return self.active_downloads.get(user_id)
+    
+    def remove_download(self, user_id: int):
+        """Remove a download task for a user"""
+        if user_id in self.active_downloads:
+            task = self.active_downloads.pop(user_id)
+            if not task.done():
+                task.cancel()
+            log.info(f"Removed download task for user {user_id}")
+
+
+# ---- End of download_manager.py ----
+
+# ---- Start of FastTelethon.py ----
+import asyncio
+import hashlib
+import inspect
+import logging
+import math
+import os
+from collections import defaultdict
+from fileinput import filename
+from typing import (
+    AsyncGenerator,
+    Awaitable,
+    BinaryIO,
+    DefaultDict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
+
+from telethon import TelegramClient, helpers, utils
+from telethon.crypto import AuthKey
+from telethon.network import MTProtoSender
+from telethon.tl.alltlobjects import LAYER
+from telethon.tl.functions import InvokeWithLayerRequest
+from telethon.tl.functions.auth import (
+    ExportAuthorizationRequest,
+    ImportAuthorizationRequest,
+)
+from telethon.tl.functions.upload import (
+    GetFileRequest,
+    SaveBigFilePartRequest,
+    SaveFilePartRequest,
+)
+from telethon.tl.types import (
+    Document,
+    InputDocumentFileLocation,
+    InputFile,
+    InputFileBig,
+    InputFileLocation,
+    InputPeerPhotoFileLocation,
+    InputPhotoFileLocation,
+    TypeInputFile,
+)
+
+log: logging.Logger = logging.getLogger("telethon")
+
+TypeLocation = Union[
+    Document,
+    InputDocumentFileLocation,
+    InputPeerPhotoFileLocation,
+    InputFileLocation,
+    InputPhotoFileLocation,
+]
+
+
+class UploadSender:
+    client: TelegramClient
+    sender: MTProtoSender
+    request: Union[SaveFilePartRequest, SaveBigFilePartRequest]
+    part_count: int
+    stride: int
+    previous: Optional[asyncio.Task]
+    loop: asyncio.AbstractEventLoop
+
+    def __init__(
+        self,
+        client: TelegramClient,
+        sender: MTProtoSender,
+        file_id: int,
+        part_count: int,
+        big: bool,
+        index: int,
+        stride: int,
+        loop: asyncio.AbstractEventLoop,
+    ) -> None:
+        self.client = client
+        self.sender = sender
+        self.part_count = part_count
+        if big:
+            self.request = SaveBigFilePartRequest(file_id, index, part_count, b"")
+        else:
+            self.request = SaveFilePartRequest(file_id, index, b"")
+        self.stride = stride
+        self.previous = None
+        self.loop = loop
+
+    async def next(self, data: bytes) -> None:
+        if self.previous:
+            await self.previous
+        self.previous = self.loop.create_task(self._next(data))
+
+    async def _next(self, data: bytes) -> None:
+        self.request.bytes = data
+        log.debug(
+            f"Sending file part {self.request.file_part}/{self.part_count}"
+            f" with {len(data)} bytes"
+        )
+        await self.client._call(self.sender, self.request)
+        self.request.file_part += self.stride
+
+    async def disconnect(self) -> None:
+        if self.previous:
+            await self.previous
+        return await self.sender.disconnect()
+
+
+class ParallelTransferrer:
+    client: TelegramClient
+    loop: asyncio.AbstractEventLoop
+    dc_id: int
+    senders: Optional[List[Union[UploadSender]]]
+    auth_key: AuthKey
+    upload_ticker: int
+
+    def __init__(self, client: TelegramClient, dc_id: Optional[int] = None) -> None:
+        self.client = client
+        self.loop = self.client.loop
+        self.dc_id = dc_id or self.client.session.dc_id
+        self.auth_key = (
+            None
+            if dc_id and self.client.session.dc_id != dc_id
+            else self.client.session.auth_key
+        )
+        self.senders = None
+        self.upload_ticker = 0
+
+    async def _cleanup(self) -> None:
+        await asyncio.gather(*[sender.disconnect() for sender in self.senders])
+        self.senders = None
+
+    @staticmethod
+    def _get_connection_count(
+        file_size: int, max_count: int = 20, full_size: int = 100 * 1024 * 1024
+    ) -> int:
+        if file_size > full_size:
+            return max_count
+        return math.ceil((file_size / full_size) * max_count)
+
+    async def _init_upload(
+        self, connections: int, file_id: int, part_count: int, big: bool
+    ) -> None:
+        self.senders = [
+            await self._create_upload_sender(file_id, part_count, big, 0, connections),
+            *await asyncio.gather(
+                *[
+                    self._create_upload_sender(file_id, part_count, big, i, connections)
+                    for i in range(1, connections)
+                ]
+            ),
+        ]
+
+    async def _create_upload_sender(
+        self, file_id: int, part_count: int, big: bool, index: int, stride: int
+    ) -> UploadSender:
+        return UploadSender(
+            self.client,
+            await self._create_sender(),
+            file_id,
+            part_count,
+            big,
+            index,
+            stride,
+            loop=self.loop,
+        )
+
+    async def _create_sender(self) -> MTProtoSender:
+        dc = await self.client._get_dc(self.dc_id)
+        sender = MTProtoSender(self.auth_key, loggers=self.client._log)
+        await sender.connect(
+            self.client._connection(
+                dc.ip_address,
+                dc.port,
+                dc.id,
+                loggers=self.client._log,
+                proxy=self.client._proxy,
+            )
+        )
+        if not self.auth_key:
+            log.debug(f"Exporting auth to DC {self.dc_id}")
+            auth = await self.client(ExportAuthorizationRequest(self.dc_id))
+            self.client._init_request.query = ImportAuthorizationRequest(
+                id=auth.id, bytes=auth.bytes
+            )
+            req = InvokeWithLayerRequest(LAYER, self.client._init_request)
+            await sender.send(req)
+            self.auth_key = sender.auth_key
+        return sender
+
+    async def init_upload(
+        self,
+        file_id: int,
+        file_size: int,
+        part_size_kb: Optional[float] = None,
+        connection_count: Optional[int] = None,
+    ) -> Tuple[int, int, bool]:
+        connection_count = connection_count or self._get_connection_count(file_size)
+        part_size = (part_size_kb or utils.get_appropriated_part_size(file_size)) * 1024
+        part_count = (file_size + part_size - 1) // part_size
+        is_large = file_size > 10 * 1024 * 1024
+        await self._init_upload(connection_count, file_id, part_count, is_large)
+        return part_size, part_count, is_large
+
+    async def upload(self, part: bytes) -> None:
+        await self.senders[self.upload_ticker].next(part)
+        self.upload_ticker = (self.upload_ticker + 1) % len(self.senders)
+
+    async def finish_upload(self) -> None:
+        await self._cleanup()
+
+
+parallel_transfer_locks: DefaultDict[int, asyncio.Lock] = defaultdict(
+    lambda: asyncio.Lock()
+)
+
+
+def stream_file(file_to_stream: BinaryIO, chunk_size=1024):
+    while True:
+        data_read = file_to_stream.read(chunk_size)
+        if not data_read:
+            break
+        yield data_read
+
+
+async def _internal_transfer_to_telegram(
+    client: TelegramClient,
+    response: BinaryIO,
+    progress_callback: callable,
+    file_name: str = None,
+) -> Tuple[TypeInputFile, int]:
+    file_id = helpers.generate_random_long()
+    file_size = os.path.getsize(response.name)
+
+    hash_md5 = hashlib.md5()
+    uploader = ParallelTransferrer(client)
+    part_size, part_count, is_large = await uploader.init_upload(file_id, file_size)
+    buffer = bytearray()
+    for data in stream_file(response):
+        if progress_callback:
+            r = progress_callback(response.tell(), file_size)
+            if inspect.isawaitable(r):
+                await r
+        if not is_large:
+            hash_md5.update(data)
+        if len(buffer) == 0 and len(data) == part_size:
+            await uploader.upload(data)
+            continue
+        new_len = len(buffer) + len(data)
+        if new_len >= part_size:
+            cutoff = part_size - len(buffer)
+            buffer.extend(data[:cutoff])
+            await uploader.upload(bytes(buffer))
+            buffer.clear()
+            buffer.extend(data[cutoff:])
+        else:
+            buffer.extend(data)
+    if len(buffer) > 0:
+        await uploader.upload(bytes(buffer))
+    await uploader.finish_upload()
+    if is_large:
+        return (
+            InputFileBig(file_id, part_count, file_name if file_name else "upload"),
+            file_size,
+        )
+    else:
+        return (
+            InputFile(
+                file_id,
+                part_count,
+                file_name if file_name else "upload",
+                hash_md5.hexdigest(),
+            ),
+            file_size,
+        )
+
+
+async def upload_file(
+    client: TelegramClient,
+    file: BinaryIO,
+    progress_callback: callable = None,
+    file_name: str = None,
+) -> TypeInputFile:
+    res = (
+        await _internal_transfer_to_telegram(client, file, progress_callback, file_name)
+    )[0]
+    return res
+
+# ---- End of FastTelethon.py ----
+
+# ---- Start of logger_config.py ----
+import logging
+import os
+import sys
+from logging.handlers import RotatingFileHandler
+
+def setup_logger(name):
+    log_dir = 'logs'
+    os.makedirs(log_dir, exist_ok=True)
+
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+
+    # Clear any existing handlers if the logger has been initialized before
+    if logger.handlers:
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
+
+    # Console handler for stdout
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.DEBUG)
+
+    # File handler with a specified filename
+    file_handler = RotatingFileHandler(
+        os.path.join(log_dir, f"{name}.log"),  # Specify the filename here
+        maxBytes=10 * 1024 * 1024,  # 10 MB
+        backupCount=5
+    )
+    file_handler.setLevel(logging.DEBUG)
+
+    # Colored formatter for console output
+    class ColoredFormatter(logging.Formatter):
+        COLORS = {
+            'DEBUG': '\033[94m',
+            'INFO': '\033[92m',
+            'WARNING': '\033[93m',
+            'ERROR': '\033[91m',
+            'CRITICAL': '\033[1;31m'
+        }
+        RESET = '\033[0m'
+
+        def format(self, record):
+            log_message = super().format(record)
+            color = self.COLORS.get(record.levelname, '')
+            return f"{color}{log_message}{self.RESET}"
+
+    formatter = ColoredFormatter(
+        '%(asctime)s | %(name)s | %(levelname)8s | %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
+    # Plain formatter for file output
+    file_formatter = logging.Formatter(
+        '%(asctime)s | %(name)s | %(levelname)8s | %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
+    # Assign formatters to handlers
+    console_handler.setFormatter(formatter)
+    file_handler.setFormatter(file_formatter)
+
+    # Add handlers to logger
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+
+    return logger
+
+
+# ---- End of logger_config.py ----
+
+# ---- Start of main.py ----
+import asyncio
+import sys
+import platform
+import logging
+import traceback
+
+# Configure event loop policy for Windows
+if platform.system() == 'Windows':
+    if sys.version_info[0] == 3 and sys.version_info[1] >= 8:
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+from telethon import TelegramClient, Button, events
+from telethon.tl.custom.message import Message
+
+# Import configurations and other necessary modules
+from config import (
+    ADMINS, API_HASH, API_ID, BOT_TOKEN,
+    FORCE_LINK, GROUP_LINK
+)
+from redis_db import db
+from send_media import VideoSender
+from terabox import get_data
+from tools import (
+    extract_code_from_url,
+    get_urls_from_string,
+    is_user_on_chat,
+    check_force_sub,
+    remove_all_videos
+)
+from logger_config import setup_logger
+from download_manager import DownloadManager
+
+# Setup logging
+log = setup_logger('terabox_main')
+
+# Initialize Download Manager
+download_manager = DownloadManager()
+
+# Initialize Telegram Client
+bot = TelegramClient("bot_session", API_ID, API_HASH)
+
+# Callback for subscription check
+@bot.on(events.CallbackQuery(pattern="check_sub"))
+async def check_subscription(event):
+    try:
+        log.info(f"Checking subscription for user {event.sender_id}")
+
+        is_subscribed = await check_force_sub(
+            bot,
+            event.sender_id,
+            FORCE_LINK,  # Channel link
+            GROUP_LINK   # Group link
+        )
+
+        if is_subscribed:
+            log.info(f"User {event.sender_id} successfully verified subscription")
+            await event.answer("✅ Successfully verified! You can now use the bot.", alert=True)
+        else:
+            log.warning(f"User {event.sender_id} has not joined channel or group")
+            await event.answer("❌ You haven't joined the channel and group yet! Please join both.", alert=True)
+
+    except Exception as e:
+        log.error(f"Error in check_subscription: {str(e)}")
+        log.debug(traceback.format_exc())
+        await event.answer("An unexpected error occurred. Please try again.", alert=True)
+
+# Cancel download command
+@bot.on(events.NewMessage(pattern="/cancel"))
+async def cancel_download(event):
+    try:
+        user_id = event.sender_id
+
+        # Get the active download info
+        download_info = download_manager.get_active_download(user_id)
+
+        if download_info is not None:
+            # Remove the download
+            download_manager.remove_download(user_id)
+
+            # Send cancellation message
+            await event.reply("✅ Download cancelled successfully!")
+            return
+
+        # If no download info, send no active download message
+        await event.reply("❌ No active download found to cancel.")
+
+    except Exception as e:
+        log.error(f"Error in cancel_download: {str(e)}")
+        await event.reply("❌ Error cancelling download.")
+
+# Main message handler
+@bot.on(
+    events.NewMessage(
+        incoming=True,
+        outgoing=False,
+        func=lambda message: message.text
+                             and get_urls_from_string(message.text)
+                             and message.is_private,
+    )
+)
+async def get_message(m: Message):
+    try:
+        log.info(f"Message received from user {m.sender_id}")
+
+        # Check if user is an admin
+        is_admin = m.sender_id in ADMINS
+
+        # Check for active downloads only for non-admin users
+        if not is_admin:
+            active_download = download_manager.get_active_download(m.sender_id)
+            if active_download:
+                await m.reply(
+                    "⚠️ You already have an active download in progress.\n"
+                    "Please wait for it to complete or use /cancel to stop it."
+                )
+                return
+
+        # Check force subscribe for both channel and group
+        is_subscribed = await check_force_sub(
+            bot,
+            m.sender_id,
+            FORCE_LINK,  # Channel link
+            GROUP_LINK  # Group link
+        )
+
+        if not is_subscribed:
+            log.warning(f"User {m.sender_id} not subscribed to channel or group")
+            buttons = [
+                [Button.url("Join Channel 📢", FORCE_LINK)],
+                [Button.url("Join Group 👥", GROUP_LINK)],
+                [Button.inline("✅ Check Subscription", "check_sub")]
+            ]
+            await m.reply(
+                "**You must join our channel and group to use this bot!**\n\n"
+                "Click the buttons below to join, then click 'Check Subscription'",
+                buttons=buttons
+            )
+            return
+
+        log.info(f"Processing message from user {m.sender_id}")
+        asyncio.create_task(handle_message(m))
+
+    except Exception as e:
+        log.error(f"Error in get_message: {str(e)}")
+        log.debug(traceback.format_exc())
+
+# Handle message and download
+async def handle_message(m: Message):
+    try:
+        # Check if user is admin
+        is_admin = m.sender_id in ADMINS
+
+        # Only check for active downloads for non-admin users
+        if not is_admin:
+            active_download = download_manager.get_active_download(m.sender_id)
+            if active_download:
+                await m.reply(
+                    "⚠️ You already have an active download in progress.\n"
+                    "Please wait for it to complete or use /cancel to stop it."
+                )
+                return
+
+        url = get_urls_from_string(m.text)
+        if not url:
+            log.warning(f"No valid URL found in message from user {m.sender_id}")
+            return await m.reply("Please enter a valid url.")
+
+        log.info(f"Processing URL: {url} from user {m.sender_id}")
+        hm = await m.reply("Processing your request, please wait...")
+
+        shorturl = extract_code_from_url(url)
+        if not shorturl:
+            log.warning(f"Invalid Terabox link format for URL: {url}")
+            return await hm.edit("Invalid Terabox link format.")
+
+        fileid = db.get_key(shorturl)
+        if fileid:
+            log.info(f"Found cached file ID {fileid} for shorturl {shorturl}")
+            uid = db.get_key(f"mid_{fileid}")
+            check = await VideoSender.forward_file(
+                file_id=fileid,
+                message=m,
+                client=bot,
+                edit_message=hm,
+                uid=uid
+            )
+            if check:
+                if not is_admin:
+                    db.increment_user_downloads(m.sender_id)
+                return
+
+        async def download_and_send():
+            try:
+                data = await get_data(url)
+                if not data:
+                    return await hm.edit(
+                        "❌ Failed to get download link. Please try:\n"
+                        "1. Check if the file still exists\n"
+                        "2. Make sure the link is public\n"
+                        "3. Try again later or try another link"
+                    )
+
+                    # Handle multiple videos
+                if isinstance(data, list):
+                    total_files = len(data)
+                    await hm.edit(f"Found {total_files} files. Downloading and sending...")
+
+                    for index, file_data in enumerate(data, 1):
+                        if file_data['sizebytes'] < 1024 * 1024:
+                            await hm.edit(f"Skipping file {index}: Invalid file size")
+                            continue
+
+                        sender = VideoSender(
+                            client=bot,
+                            data=file_data,
+                            message=m,
+                            edit_message=hm,
+                            url=url,
+                        )
+
+                        await sender.send_video()
+                        await asyncio.sleep(1)  # Small delay between files
+
+                    # Existing single video handling
+                else:
+                    sender = VideoSender(
+                        client=bot,
+                        data=data,
+                        message=m,
+                        edit_message=hm,
+                        url=url,
+                    )
+                    await sender.send_video()
+
+            except Exception as e:
+                log.error(f"Unexpected error in handle_message: {str(e)}")
+                await hm.edit("An unexpected error occurred while processing the link.")
+
+        # For admins, use create_task to allow multiple downloads
+        # For non-admins, use the existing add_download method
+        if is_admin:
+            asyncio.create_task(download_and_send())
+            return
+
+        # Add download task to manager for non-admins
+        success = await download_manager.add_download(m.sender_id, download_and_send())
+        if success == "queued":
+            await m.reply(
+                "⚠️ The system is currently processing other downloads. Your request has been queued. "
+                "Please wait, and you'll be notified when your download begins."
+            )
+        elif not success:
+            await hm.edit(
+                "⚠️ You already have an active download.\n"
+                "Please wait for it to complete or use /cancel to stop it."
+            )
+
+    except Exception as e:
+        log.error(f"Unexpected error in handle_message: {str(e)}")
+        log.debug(traceback.format_exc())
+
+# Admin commands
+@bot.on(events.NewMessage(pattern=r"^/status$", from_users=ADMINS))
+async def bot_status(event):
+    try:
+        # Check Redis connection health
+        redis_health = "Connected" if db.ping() else "Disconnected"
+
+        # Get Redis memory stats
+        redis_info = db.info()
+        memory_usage = redis_info.get("used_memory_human", "N/A")
+        total_keys = len(db.keys())
+
+        # Get active downloads
+        active_count = len(download_manager.active_downloads)
+        queued_count = len(download_manager.download_queue)
+
+        # Generate status message
+        status_message = (
+            f"**Bot Health:**\n"
+            f"- Redis: {redis_health}\n"
+            f"- Memory Usage: {memory_usage}\n"
+            f"- Total Cached Keys: {total_keys}\n\n"
+            f"**Downloads:**\n"
+            f"- Active Downloads: {active_count}\n"
+            f"- Queued Downloads: {queued_count}\n\n"
+            f"**Active Users:**\n"
+        )
+
+        for user_id in download_manager.active_downloads.keys():
+            status_message += f"- User ID: {user_id}\n"
+
+        await event.reply(status_message)
+    except Exception as e:
+        log.error(f"Error fetching bot status: {str(e)}")
+        await event.reply("❌ Failed to fetch bot status.")
+
+
+@bot.on(events.NewMessage(pattern=r"^/test_queue$", from_users=ADMINS))
+async def test_queue(event):
+    try:
+        log.info(f"Simulating multiple users for queue testing")
+
+        # Simulate multiple user IDs
+        for user_id in range(1001, 1999):  # Simulates 10 users with IDs 1001-1010
+            await event.reply(f"Simulating user {user_id} request.")
+            # Simulate adding a download request
+            success = await download_manager.add_download(user_id, fake_download_task(user_id))
+            if success == "queued":
+                await event.reply(f"User {user_id} was queued.")
+            elif success:
+                await event.reply(f"User {user_id}'s download started.")
+            else:
+                await event.reply(f"User {user_id} already has an active download.")
+
+    except Exception as e:
+        log.error(f"Error simulating queue: {str(e)}")
+        await event.reply("❌ Failed to simulate the queue.")
+
+
+# A simple fake download task for simulation purposes
+async def fake_download_task(user_id):
+    log.info(f"Starting fake download for user {user_id}")
+    await asyncio.sleep(12)  # Simulate download time
+    log.info(f"Fake download complete for user {user_id}")
+
+
+import asyncio
+import logging
+from telethon import events
+from telethon.errors import FloodWaitError
+
+
+@bot.on(events.NewMessage(pattern=r"^/check_queue$", from_users=ADMINS))
+async def check_queue_status(event):
+    try:
+        # Avoid sending multiple messages if flood is likely
+        active_count = len(download_manager.active_downloads)
+        queued_count = len(download_manager.download_queue)
+
+        # Create status message
+        status_message = (
+            f"**Queue Status:**\n"
+            f"- Active Downloads: {active_count}\n"
+            f"- Queued Downloads: {queued_count}\n"
+        )
+
+        try:
+            # Use a separate method to send message with flood protection
+            await safe_reply(event, status_message)
+        except FloodWaitError as flood:
+            # Log the flood wait
+            log.warning(f"Flood wait required. Waiting for {flood.seconds} seconds")
+
+            # Send a private message to the admin
+            await event.client.send_message(
+                event.sender_id,
+                f"⚠️ Queue check temporarily disabled. "
+                f"Please wait {flood.seconds} seconds before trying again."
+            )
+
+    except Exception as e:
+        log.error(f"Error checking queue status: {str(e)}")
+        try:
+            await safe_reply(event, "❌ Failed to check queue status.")
+        except:
+            # Fallback if even the error message can't be sent
+            log.error("Could not send error message")
+
+
+async def safe_reply(event, message, **kwargs):
+    """
+    Safely send a reply with built-in flood protection
+    """
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            # Attempt to send the message
+            return await event.reply(message, **kwargs)
+        except FloodWaitError as flood:
+            # Log the flood wait
+            log.warning(f"Flood wait required. Seconds: {flood.seconds}")
+
+            # Wait out the flood wait
+            await asyncio.sleep(flood.seconds)
+        except Exception as e:
+            log.error(f"Error in safe_reply (attempt {attempt + 1}): {str(e)}")
+
+            # If it's the last attempt, re-raise the exception
+            if attempt == max_retries - 1:
+                raise
+
+            # Wait a bit before retrying
+            await asyncio.sleep(2 ** attempt)
+
+    # This should never be reached due to the max_retries logic
+    raise Exception("Failed to send message after multiple attempts")
+
+
+# Global error handler for Telethon
+async def global_error_handler(error):
+    """
+    Global error handler to catch and log various errors
+    """
+    if isinstance(error, FloodWaitError):
+        log.warning(f"Global Flood Wait: Waiting for {error.seconds} seconds")
+
+        # Notify admins about the flood wait
+        for admin in ADMINS:
+            try:
+                await bot.send_message(
+                    admin,
+                    f"⚠️ Bot experiencing Telegram API flood wait. "
+                    f"Pausing for {error.seconds} seconds."
+                )
+            except Exception as notify_error:
+                log.error(f"Could not notify admin: {notify_error}")
+
+        # Wait out the flood
+        await asyncio.sleep(error.seconds)
+    else:
+        # Log other types of errors
+        log.error(f"Unhandled error: {error}")
+
+
+# Set up error handling when initializing the bot
+async def initialize_and_run_bot():
+    try:
+        # Set up global error handler
+        bot.add_event_handler(global_error_handler)
+
+        # Connect to the bot
+        await bot.connect()
+
+        # Start the bot with the token
+        await bot.start(bot_token=BOT_TOKEN)
+
+        log.info("Bot started successfully")
+
+        # Keep the bot running
+        await bot.run_until_disconnected()
+
+    except Exception as e:
+        log.error(f"Bot initialization error: {str(e)}")
+        log.debug(traceback.format_exc())
+
+
+@bot.on(events.NewMessage(pattern=r"^/active_downloads$", from_users=ADMINS))
+async def active_downloads_status(event):
+    try:
+        active_count = len(download_manager.active_downloads)
+        queued_count = len(download_manager.download_queue)
+
+        # Build active downloads message
+        message = f"**Active Downloads:** {active_count}\n"
+        for user_id, task in download_manager.active_downloads.items():
+            message += f"- User ID: {user_id}\n"
+
+        message += f"\n**Queued Downloads:** {queued_count}\n"
+        for queued_user, _ in download_manager.download_queue:
+            message += f"- User ID: {queued_user}\n"
+
+        await event.reply(message)
+    except Exception as e:
+        log.error(f"Error fetching active downloads: {str(e)}")
+        await event.reply("❌ Failed to fetch active downloads.")
+
+# Main bot initialization and run function
+async def initialize_and_run_bot():
+    try:
+        # Connect to the bot
+        await bot.connect()
+
+        # Start the bot with the token
+        await bot.start(bot_token=BOT_TOKEN)
+
+        log.info("Bot started successfully")
+
+        # Keep the bot running
+        await bot.run_until_disconnected()
+
+    except Exception as e:
+        log.error(f"Bot initialization error: {str(e)}")
+        log.debug(traceback.format_exc())
+
+# Entry point of the script
+def main():
+    try:
+        # Run the bot
+        asyncio.run(initialize_and_run_bot())
+    except KeyboardInterrupt:
+        log.info("Bot stopped manually")
+    except Exception as e:
+        log.error(f"Unexpected error: {str(e)}")
+
+# Run the bot
+if __name__ == '__main__':
+    main()
+
+# ---- End of main.py ----
+
+# ---- Start of merged_output.py ----
+import logging
+import time
+import traceback
+
+import humanreadable as hr
+from telethon import Button
+from telethon.sync import TelegramClient, events
+from telethon.tl.custom.message import Message
+from telethon.tl.types import UpdateNewMessage
+
+from config import (ADMINS, API_HASH, API_ID, BOT_TOKEN, BOT_USERNAME,
+                    FORCE_LINK, GROUP_LINK)
+from redis_db import db
+from send_media import VideoSender
+from tools import generate_shortenedUrl, is_user_on_chat, remove_all_videos, check_force_sub
+from logger_config import setup_logger
+
+# Setup logger
+log = setup_logger('terabox_bot')
+
+bot = TelegramClient("bot", API_ID, API_HASH)
+
+
+@bot.on(events.NewMessage(pattern="/start", func=lambda x: x.is_private))
+async def start_command(event):
+    try:
+        log.info(f"Start command received from user {event.sender_id}")
+
+        is_subscribed = await check_force_sub(bot, event.sender_id, FORCE_LINK, GROUP_LINK)
+
+        if not is_subscribed:
+            log.warning(f"User {event.sender_id} not subscribed to force channel")
+            buttons = [
+                [Button.url("Join Channel 📢", FORCE_LINK)],
+                [Button.inline("✅ Check Subscription", "check_sub")]
+            ]
+            await event.reply(
+                "**You must join our channel to use this bot!**\n\n"
+                "Click the button below to join, then click 'Check Subscription'",
+                buttons=buttons
+            )
+            return
+
+        log.info(f"User {event.sender_id} successfully passed subscription check")
+        await event.reply("Welcome! You can now use the bot.")
+
+    except Exception as e:
+        log.error(f"Error in start command: {str(e)}")
+        log.debug(traceback.format_exc())
+
+
+@bot.on(
+    events.NewMessage(
+        pattern="/start (?!token_)([0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12})",
+        incoming=True,
+        outgoing=False,
+        func=lambda x: x.is_private,
+    )
+)
+async def start_ntoken(m: Message):
+    try:
+        log.info(f"Start token command received from user {m.sender_id}")
+        text = m.pattern_match.group(1)
+        fileid = db.get_key(str(text))
+
+        if fileid:
+            log.info(f"Found file ID {fileid} for token {text}")
+            return await VideoSender.forward_file(
+                file_id=fileid, message=m, client=bot, uid=text.strip()
+            )
+        else:
+            log.warning(f"No file found for token {text}")
+            return await m.reply("Your requested file is not available.")
+
+    except Exception as e:
+        log.error(f"Error in start token command: {str(e)}")
+        log.debug(traceback.format_exc())
+
+
+@bot.on(
+    events.NewMessage(
+        pattern="/remove (.*)",
+        incoming=True,
+        outgoing=False,
+        from_users=ADMINS,
+    )
+)
+async def remove(m: UpdateNewMessage):
+    try:
+        user_id = m.pattern_match.group(1)
+        log.info(f"Admin attempting to remove user {user_id}")
+
+        if db.get(f"check_{user_id}"):
+            db.delete(f"check_{user_id}")
+            log.info(f"Successfully removed {user_id} from the list")
+            await m.reply(f"Removed {user_id} from the list.")
+        else:
+            log.warning(f"User {user_id} not found in the list")
+            await m.reply(f"{user_id} is not in the list.")
+
+    except Exception as e:
+        log.error(f"Error in remove command: {str(e)}")
+        log.debug(traceback.format_exc())
+
+
+@bot.on(
+    events.NewMessage(
+        pattern="/removeall",
+        incoming=True,
+        outgoing=False,
+        from_users=ADMINS,
+    )
+)
+async def removeall(m: UpdateNewMessage):
+    try:
+        log.info("Admin triggered remove all videos")
+        remove_all_videos()
+        log.info("All videos removed successfully")
+        return await m.reply("Removed all videos from the list.")
+
+    except Exception as e:
+        log.error(f"Error in removeall command: {str(e)}")
+        log.debug(traceback.format_exc())
+
+
+# Bot startup
+log.info("Starting Terabox Bot")
+bot.start(bot_token=BOT_TOKEN)
+log.info("Bot started successfully")
+bot.run_until_disconnected()
+
+
+
+class CanSend:
+    def can_send(self):
+        if not hasattr(self, "last_send_time"):
+            self.last_send_time = time.time() - 20
+        current_time = time.time()
+        elapsed_time = current_time - self.last_send_time
+
+        if elapsed_time >= 5:
+            self.last_send_time = current_time
+            return True
+        else:
+            return False
+
+
+API_ID = 22077446  # api id
+API_HASH = "0527c89278635af66b9fef52b2314a6a"  # api hash
+
+# BOT_TOKEN = "7733315589:AAH3FAqe3lvE0oTNUTDQcCMlL1DLWv3vNXk"  # bot token
+BOT_TOKEN = "7888870286:AAFyDSij8xAHu2tb-qL1Z3qvtLaxOamS_b0"  # bot token
+BOT_ID = "bot2"
+
+
+# REDIS
+HOST = "localhost"  # redis host uri
+PORT = 6379  # redis port
+PASSWORD = ""  # redis password
+
+PRIVATE_CHAT_ID = -1002319496630  # CHAT WHERE YOU WANT TO STORE VIDEOS
+# COOKIE FOR AUTHENTICATION (get from chrome dev tools) ex: "PANWEB=1; csrfToken=;
+COOKIE = "_ga_K6JMPYL99R=GS1.1.1731126528.1.1.1731127046.0.0.0; lang=en; ab_ymg_result={\"data\":\"278adec0aa3889af192bd64c67fb9296dfc5124533fae6ea2d31e7a8276fd25cd18875021ae5bd944e397cca19737a3d933142c7c7471afcd5b18284ade7855924c1140833c7711cafa531ef11c0ede9e2fafbdd3da9fb07290243a5d99e1f6c64c5d40daa65dc7921d9d03340af0bdb2624321132135f9e45d63af037d6565f\",\"key_id\":\"66\",\"sign\":\"6979b514\"}; _ga_06ZNKL8C2E=GS1.1.1731388745.19.0.1731388745.60.0.0; ndut_fmt=1DD4F12B7EFEAFCC8782433F51156C0B5D23A63D65C36FBE96EDE478C195BC45; _gcl_au=1.1.1404192662.1731126528; ndus=Yzwct3HteHuiA-J3WyKhtzVYqg6MC9c0z2gxg562; _ga=GA1.1.1546179099.1728922834; ab_sr=1.0.1_NzhkMGEwY2RhYjZkMzFhODQxNDA2Y2FhNTNmOWQ3MmJhNzNiMWIzZWFhYzBiOGZhNjhlNTYzZmNhYzE3MTRkMGVkNDUzNTc5OGI3ZDQ1Mzc5Y2IxY2JlYzM0OGRkZWRjM2Q3Y2FlZDBkYzhlOTFmMDBiZTQyZjY2MWNlM2Q4ZjNlOTBlODlhMDYyY2U3MmZkYjRhZmYyYjRhOWMyOTI3Yg==; __bid_n=1928a8420c455a6d524207; __stripe_mid=1e6e4ef5-21dc-4260-adbc-cd52ef3b7e7868d745; browserid=5CKEOlmkcvD7gUObuDnBjTHYQPZHXt7xDxpLJpSHCbS8uUS7V2q9jnVwT0k=; csrfToken=tll0NzBBvbXx5UWRleQlR3B2; PANWEB=1";
+
+ADMINS = [5911372021]
+
+
+BOT_USERNAME = "TeraInfoBot"
+
+# Force user to join this channel. (make sure you have promoted the bot on this chat.)
+FORCE_LINK = "https://t.me/terabox_downloader_by_ronnie"
+# In config.py, add:
+GROUP_LINK = "https://t.me/RonniesVerse"  # Replace with your group link
+
+
+
+import asyncio
+from typing import Dict
+
+log = setup_logger('download')
+
+
+class DownloadManager:
+    def __init__(self):
+        self.active_downloads: Dict[int, asyncio.Task] = {}
+        
+    async def add_download(self, user_id: int, download_coroutine):
+        """Add a new download task for a user"""
+        try:
+            if user_id in self.active_downloads:
+                if not self.active_downloads[user_id].done():
+                    log.info(f"User {user_id} already has an active download")
+                    return False
+                else:
+                    # Clean up completed download
+                    self.active_downloads.pop(user_id)
+            
+            # Create new download task
+            task = asyncio.create_task(download_coroutine)
+            self.active_downloads[user_id] = task
+            log.info(f"Added new download task for user {user_id}")
+            return True
+            
+        except Exception as e:
+            log.error(f"Error adding download for user {user_id}: {str(e)}")
+            return False
+    
+    def get_active_download(self, user_id: int):
+        """Get active download task for a user"""
+        return self.active_downloads.get(user_id)
+    
+    def remove_download(self, user_id: int):
+        """Remove a download task for a user"""
+        if user_id in self.active_downloads:
+            task = self.active_downloads.pop(user_id)
+            if not task.done():
+                task.cancel()
+            log.info(f"Removed download task for user {user_id}")
+
+
+import hashlib
+import inspect
+import math
+import os
+from collections import defaultdict
+from fileinput import filename
+from typing import (
+    AsyncGenerator,
+    Awaitable,
+    BinaryIO,
+    DefaultDict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
+
+from telethon import TelegramClient, helpers, utils
+from telethon.crypto import AuthKey
+from telethon.network import MTProtoSender
+from telethon.tl.alltlobjects import LAYER
+from telethon.tl.functions import InvokeWithLayerRequest
+from telethon.tl.functions.auth import (
+    ExportAuthorizationRequest,
+    ImportAuthorizationRequest,
+)
+from telethon.tl.functions.upload import (
+    GetFileRequest,
+    SaveBigFilePartRequest,
+    SaveFilePartRequest,
+)
+from telethon.tl.types import (
+    Document,
+    InputDocumentFileLocation,
+    InputFile,
+    InputFileBig,
+    InputFileLocation,
+    InputPeerPhotoFileLocation,
+    InputPhotoFileLocation,
+    TypeInputFile,
+)
+
+log: logging.Logger = logging.getLogger("telethon")
+
+TypeLocation = Union[
+    Document,
+    InputDocumentFileLocation,
+    InputPeerPhotoFileLocation,
+    InputFileLocation,
+    InputPhotoFileLocation,
+]
+
+
+class UploadSender:
+    client: TelegramClient
+    sender: MTProtoSender
+    request: Union[SaveFilePartRequest, SaveBigFilePartRequest]
+    part_count: int
+    stride: int
+    previous: Optional[asyncio.Task]
+    loop: asyncio.AbstractEventLoop
+
+    def __init__(
+        self,
+        client: TelegramClient,
+        sender: MTProtoSender,
+        file_id: int,
+        part_count: int,
+        big: bool,
+        index: int,
+        stride: int,
+        loop: asyncio.AbstractEventLoop,
+    ) -> None:
+        self.client = client
+        self.sender = sender
+        self.part_count = part_count
+        if big:
+            self.request = SaveBigFilePartRequest(file_id, index, part_count, b"")
+        else:
+            self.request = SaveFilePartRequest(file_id, index, b"")
+        self.stride = stride
+        self.previous = None
+        self.loop = loop
+
+    async def next(self, data: bytes) -> None:
+        if self.previous:
+            await self.previous
+        self.previous = self.loop.create_task(self._next(data))
+
+    async def _next(self, data: bytes) -> None:
+        self.request.bytes = data
+        log.debug(
+            f"Sending file part {self.request.file_part}/{self.part_count}"
+            f" with {len(data)} bytes"
+        )
+        await self.client._call(self.sender, self.request)
+        self.request.file_part += self.stride
+
+    async def disconnect(self) -> None:
+        if self.previous:
+            await self.previous
+        return await self.sender.disconnect()
+
+
+class ParallelTransferrer:
+    client: TelegramClient
+    loop: asyncio.AbstractEventLoop
+    dc_id: int
+    senders: Optional[List[Union[UploadSender]]]
+    auth_key: AuthKey
+    upload_ticker: int
+
+    def __init__(self, client: TelegramClient, dc_id: Optional[int] = None) -> None:
+        self.client = client
+        self.loop = self.client.loop
+        self.dc_id = dc_id or self.client.session.dc_id
+        self.auth_key = (
+            None
+            if dc_id and self.client.session.dc_id != dc_id
+            else self.client.session.auth_key
+        )
+        self.senders = None
+        self.upload_ticker = 0
+
+    async def _cleanup(self) -> None:
+        await asyncio.gather(*[sender.disconnect() for sender in self.senders])
+        self.senders = None
+
+    @staticmethod
+    def _get_connection_count(
+        file_size: int, max_count: int = 20, full_size: int = 100 * 1024 * 1024
+    ) -> int:
+        if file_size > full_size:
+            return max_count
+        return math.ceil((file_size / full_size) * max_count)
+
+    async def _init_upload(
+        self, connections: int, file_id: int, part_count: int, big: bool
+    ) -> None:
+        self.senders = [
+            await self._create_upload_sender(file_id, part_count, big, 0, connections),
+            *await asyncio.gather(
+                *[
+                    self._create_upload_sender(file_id, part_count, big, i, connections)
+                    for i in range(1, connections)
+                ]
+            ),
+        ]
+
+    async def _create_upload_sender(
+        self, file_id: int, part_count: int, big: bool, index: int, stride: int
+    ) -> UploadSender:
+        return UploadSender(
+            self.client,
+            await self._create_sender(),
+            file_id,
+            part_count,
+            big,
+            index,
+            stride,
+            loop=self.loop,
+        )
+
+    async def _create_sender(self) -> MTProtoSender:
+        dc = await self.client._get_dc(self.dc_id)
+        sender = MTProtoSender(self.auth_key, loggers=self.client._log)
+        await sender.connect(
+            self.client._connection(
+                dc.ip_address,
+                dc.port,
+                dc.id,
+                loggers=self.client._log,
+                proxy=self.client._proxy,
+            )
+        )
+        if not self.auth_key:
+            log.debug(f"Exporting auth to DC {self.dc_id}")
+            auth = await self.client(ExportAuthorizationRequest(self.dc_id))
+            self.client._init_request.query = ImportAuthorizationRequest(
+                id=auth.id, bytes=auth.bytes
+            )
+            req = InvokeWithLayerRequest(LAYER, self.client._init_request)
+            await sender.send(req)
+            self.auth_key = sender.auth_key
+        return sender
+
+    async def init_upload(
+        self,
+        file_id: int,
+        file_size: int,
+        part_size_kb: Optional[float] = None,
+        connection_count: Optional[int] = None,
+    ) -> Tuple[int, int, bool]:
+        connection_count = connection_count or self._get_connection_count(file_size)
+        part_size = (part_size_kb or utils.get_appropriated_part_size(file_size)) * 1024
+        part_count = (file_size + part_size - 1) // part_size
+        is_large = file_size > 10 * 1024 * 1024
+        await self._init_upload(connection_count, file_id, part_count, is_large)
+        return part_size, part_count, is_large
+
+    async def upload(self, part: bytes) -> None:
+        await self.senders[self.upload_ticker].next(part)
+        self.upload_ticker = (self.upload_ticker + 1) % len(self.senders)
+
+    async def finish_upload(self) -> None:
+        await self._cleanup()
+
+
+parallel_transfer_locks: DefaultDict[int, asyncio.Lock] = defaultdict(
+    lambda: asyncio.Lock()
+)
+
+
+def stream_file(file_to_stream: BinaryIO, chunk_size=1024):
+    while True:
+        data_read = file_to_stream.read(chunk_size)
+        if not data_read:
+            break
+        yield data_read
+
+
+async def _internal_transfer_to_telegram(
+    client: TelegramClient,
+    response: BinaryIO,
+    progress_callback: callable,
+    file_name: str = None,
+) -> Tuple[TypeInputFile, int]:
+    file_id = helpers.generate_random_long()
+    file_size = os.path.getsize(response.name)
+
+    hash_md5 = hashlib.md5()
+    uploader = ParallelTransferrer(client)
+    part_size, part_count, is_large = await uploader.init_upload(file_id, file_size)
+    buffer = bytearray()
+    for data in stream_file(response):
+        if progress_callback:
+            r = progress_callback(response.tell(), file_size)
+            if inspect.isawaitable(r):
+                await r
+        if not is_large:
+            hash_md5.update(data)
+        if len(buffer) == 0 and len(data) == part_size:
+            await uploader.upload(data)
+            continue
+        new_len = len(buffer) + len(data)
+        if new_len >= part_size:
+            cutoff = part_size - len(buffer)
+            buffer.extend(data[:cutoff])
+            await uploader.upload(bytes(buffer))
+            buffer.clear()
+            buffer.extend(data[cutoff:])
+        else:
+            buffer.extend(data)
+    if len(buffer) > 0:
+        await uploader.upload(bytes(buffer))
+    await uploader.finish_upload()
+    if is_large:
+        return (
+            InputFileBig(file_id, part_count, file_name if file_name else "upload"),
+            file_size,
+        )
+    else:
+        return (
+            InputFile(
+                file_id,
+                part_count,
+                file_name if file_name else "upload",
+                hash_md5.hexdigest(),
+            ),
+            file_size,
+        )
+
+
+async def upload_file(
+    client: TelegramClient,
+    file: BinaryIO,
+    progress_callback: callable = None,
+    file_name: str = None,
+) -> TypeInputFile:
+    res = (
+        await _internal_transfer_to_telegram(client, file, progress_callback, file_name)
+    )[0]
+    return res
+
+import sys
+from logging.handlers import RotatingFileHandler
+
+def setup_logger(name):
+    log_dir = 'logs'
+    os.makedirs(log_dir, exist_ok=True)
+
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+
+    # Clear any existing handlers if the logger has been initialized before
+    if logger.handlers:
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
+
+    # Console handler for stdout
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.DEBUG)
+
+    # File handler with a specified filename
+    file_handler = RotatingFileHandler(
+        os.path.join(log_dir, f"{name}.log"),  # Specify the filename here
+        maxBytes=10 * 1024 * 1024,  # 10 MB
+        backupCount=5
+    )
+    file_handler.setLevel(logging.DEBUG)
+
+    # Colored formatter for console output
+    class ColoredFormatter(logging.Formatter):
+        COLORS = {
+            'DEBUG': '\033[94m',
+            'INFO': '\033[92m',
+            'WARNING': '\033[93m',
+            'ERROR': '\033[91m',
+            'CRITICAL': '\033[1;31m'
+        }
+        RESET = '\033[0m'
+
+        def format(self, record):
+            log_message = super().format(record)
+            color = self.COLORS.get(record.levelname, '')
+            return f"{color}{log_message}{self.RESET}"
+
+    formatter = ColoredFormatter(
+        '%(asctime)s | %(name)s | %(levelname)8s | %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
+    # Plain formatter for file output
+    file_formatter = logging.Formatter(
+        '%(asctime)s | %(name)s | %(levelname)8s | %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
+    # Assign formatters to handlers
+    console_handler.setFormatter(formatter)
+    file_handler.setFormatter(file_formatter)
+
+    # Add handlers to logger
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+
+    return logger
+
+
+
+
+# ---- End of merged_output.py ----
+
+# ---- Start of redis_cache.py ----
+import redis
+import json
+from typing import Dict, Any
+
+
+class RedisCache:
+    def __init__(self, host='localhost', port=6379):
+        self.redis_client = redis.Redis(host=host, port=port)
+
+    def store_video_metadata(self, video_id: str, metadata: Dict[str, Any]):
+        """
+        Store complete video metadata in Redis
+        """
+        self.redis_client.hmset(f"video:{video_id}", {
+            'file_path': metadata.get('file_path', ''),
+            'file_size': metadata.get('file_size', 0),
+            'download_url': metadata.get('download_url', ''),
+            'timestamp': metadata.get('timestamp', '')
+        })
+        # Set expiration to 7 days
+        self.redis_client.expire(f"video:{video_id}", 7 * 24 * 60 * 60)
+
+    def get_video_metadata(self, video_id: str) -> Dict[str, Any]:
+        """
+        Retrieve video metadata from Redis
+        """
+        metadata = self.redis_client.hgetall(f"video:{video_id}")
+        if metadata:
+            return {
+                k.decode(): v.decode()
+                for k, v in metadata.items()
+            }
+        return {}
+
+    def check_video_exists(self, video_id: str) -> bool:
+        """
+        Check if video metadata exists in cache
+        """
+        return self.redis_client.exists(f"video:{video_id}")
+
+
+# Global Redis Cache Instance
+redis_cache = RedisCache()
+
+# ---- End of redis_cache.py ----
+
+# ---- Start of redis_db.py ----
+import logging
+import os
+import sys
+import threading
+import traceback
+from typing import Any
+
+from redis import Redis as r
+
+from config import HOST, PASSWORD, PORT
+from logger_config import setup_logger
+log = setup_logger('redis_database')
+
+class Redis(r):
+    def __init__(
+            self,
+            host: str = None,
+            port: int = None,
+            password: str = None,
+            logger=None,
+            encoding: str = "utf-8",
+            decode_responses=True,
+            **kwargs,
+    ):
+        try:
+            log.info("Initializing Redis connection")
+
+            # Enhanced host and port parsing
+            if ":" in host:
+                data = host.split(":")
+                host = data[0]
+                port = int(data[1])
+
+            if host.startswith("http"):
+                log.error("REDIS_URI should not start with http!")
+                sys.exit(1)
+
+            if not host or not port:
+                log.error("Host or Port Number not found")
+                sys.exit(1)
+
+            # Prepare connection kwargs
+            kwargs["host"] = host
+            if password and len(password) > 1:
+                kwargs["password"] = password
+            kwargs["port"] = port
+            kwargs["encoding"] = encoding
+            kwargs["decode_responses"] = decode_responses
+
+            # Attempt Redis connection
+            try:
+                super().__init__(**kwargs)
+                log.info(f"Connected to Redis at {host}:{port}")
+            except Exception as e:
+                log.critical(f"Failed to connect to Redis: {str(e)}")
+                sys.exit(1)
+
+            # Initialize cache
+            self.logger = logger or log
+            self._cache = {}
+
+            # Start cache refresh thread
+            threading.Thread(target=self.re_cache, daemon=True).start()
+
+        except Exception as e:
+            log.error(f"Unexpected error in Redis initialization: {str(e)}")
+            log.debug(traceback.format_exc())
+            sys.exit(1)
+
+    def re_cache(self):
+        """
+        Refresh the local cache with Redis keys
+        """
+        try:
+            log.debug("Starting cache refresh")
+            keys = self.keys()
+            self._cache = {key: self.get(key) for key in keys}
+            log.info(f"Cached {len(self._cache)} keys")
+        except Exception as e:
+            log.error(f"Error during cache refresh: {str(e)}")
+            log.debug(traceback.format_exc())
+
+    def get_key(self, key: Any):
+        """
+        Retrieve a key from cache or Redis
+        """
+        try:
+            if key in self._cache:
+                log.debug(f"Retrieved key {key} from cache")
+                return self._cache[key]
+
+            data = self.get(key)
+            if data is not None:
+                log.debug(f"Retrieved key {key} from Redis")
+                self._cache[key] = data
+
+            return data
+        except Exception as e:
+            log.error(f"Error retrieving key {key}: {str(e)}")
+            log.debug(traceback.format_exc())
+            return None
+
+    def del_key(self, key: Any):
+        """
+        Delete a key from cache and Redis
+        """
+        try:
+            log.info(f"Deleting key {key}")
+            if key in self._cache:
+                del self._cache[key]
+            return self.delete(key)
+        except Exception as e:
+            log.error(f"Error deleting key {key}: {str(e)}")
+            log.debug(traceback.format_exc())
+            return False
+
+    def set_key(self, key: Any = None, value: Any = None, **kwargs):
+        """
+        Set a key in cache and Redis
+        """
+        try:
+            log.info(f"Setting key {key}")
+            self._cache[key] = value
+            return self.set(key, value, **kwargs)
+        except Exception as e:
+            log.error(f"Error setting key {key}: {str(e)}")
+            log.debug(traceback.format_exc())
+            return False
+
+    def incr(self, key, amount=1):
+        """
+        Increment a key's value
+        """
+        try:
+            log.debug(f"Incrementing key {key} by {amount}")
+            result = super().incr(key, amount)
+            self._cache[key] = result
+            return result
+        except Exception as e:
+            log.error(f"Error incrementing key {key}: {str(e)}")
+            log.debug(traceback.format_exc())
+            return 0
+
+    def increment_user_downloads(self, user_id: int) -> int:
+        """Increment download count for user and return total downloads in last 24h"""
+        key = f"user_downloads:{user_id}"
+        pipe = self.pipeline()
+        pipe.incr(key)
+        pipe.expire(key, 86400)  # 24 hours in seconds
+        result = pipe.execute()
+        return result[0]
+
+    def get_user_downloads(self, user_id: int) -> int:
+        """Get total downloads for user in last 24h"""
+        key = f"user_downloads:{user_id}"
+        count = self.get(key)
+        return int(count) if count else 0
+
+
+# Create Redis instance
+try:
+    db = Redis(
+        host=HOST,
+        port=PORT,
+        password=PASSWORD if len(PASSWORD) > 1 else None,
+        decode_responses=True,
+    )
+
+    # Verify Redis connection
+    if not db.ping():
+        log.critical(f"Redis is not available on {HOST}:{PORT}")
+        sys.exit(1)
+    else:
+        log.info(f"Successfully connected to Redis on {HOST}:{PORT}")
+
+except Exception as e:
+    log.critical(f"Fatal error setting up Redis: {str(e)}")
+    log.debug(traceback.format_exc())
+    sys.exit(1)
+
+
+# ---- End of redis_db.py ----
+
+# ---- Start of send_media.py ----
+import asyncio
+import logging
+import os
+import time
+import traceback
+from pathlib import Path
+from uuid import uuid4
+
+import telethon
+from telethon import Button, TelegramClient, events, utils
+from telethon.events.newmessage import NewMessage
+from telethon.tl.functions.channels import GetMessagesRequest
+from telethon.tl.patched import Message
+from telethon.tl.types import Document
+from telethon.types import UpdateEditMessage
+
+from cansend import CanSend
+from config import BOT_USERNAME, PRIVATE_CHAT_ID
+from FastTelethon import upload_file
+from redis_db import db
+from tools import (
+    convert_seconds,
+    download_file,
+    download_image_to_bytesio,
+    extract_code_from_url,
+    get_formatted_size,
+)
+from logger_config import setup_logger
+
+# Setup logger
+log = setup_logger('media_sender')
+
+
+class VideoSender:
+    def __init__(
+            self,
+            client: TelegramClient,
+            message: NewMessage.Event,
+            edit_message: Message,
+            url: str,
+            data,
+    ):
+        try:
+            log.info(f"Initializing VideoSender for file: {data.get('file_name', 'Unknown')}")
+
+            self.client = client
+            self.data = data
+            self.url = url
+            self.edit_message = edit_message
+            self.message = message
+            self.uuid = str(uuid4())
+            self.stop_sending = False
+            self.thumbnail = self.get_thumbnail()
+            self.can_send = CanSend()
+            self.start_time = time.time()
+            self.task = None
+            self.download = f"downloads/{self.uuid}_{self.data['file_name']}"
+
+            # Ensure downloads directory exists
+            os.makedirs("downloads", exist_ok=True)
+
+            self.client.add_event_handler(
+                self.stop, events.CallbackQuery(pattern=f"^stop{self.uuid}")
+            )
+
+            self.caption = f"""
+File Name: `{self.data['file_name']}`
+Size: **{self.data["size"]}**
+
+@RonniesVerse
+            """
+
+            self.caption2 = f"""
+Downloading `{self.data['file_name']}`
+Size: **{self.data["size"]}**
+
+@RonniesVerse
+            """
+
+        except Exception as e:
+            log.error(f"Error initializing VideoSender: {str(e)}")
+            log.debug(traceback.format_exc())
+            raise
+
+    async def progress_bar(self, current_downloaded, total_downloaded, state="Sending"):
+        try:
+            if not self.can_send.can_send():
+                return
+
+            bar_length = 20
+            percent = current_downloaded / total_downloaded
+            arrow = "█" * int(percent * bar_length)
+            spaces = "░" * (bar_length - len(arrow))
+
+            elapsed_time = time.time() - self.start_time
+
+            head_text = f"{state} `{self.data['file_name']}`"
+            progress_bar = f"[{arrow + spaces}] {percent:.2%}"
+            upload_speed = current_downloaded / elapsed_time if elapsed_time > 0 else 0
+            speed_line = f"Speed: **{get_formatted_size(upload_speed)}/s**"
+
+            time_remaining = (
+                (total_downloaded - current_downloaded) / upload_speed
+                if upload_speed > 0
+                else 0
+            )
+            time_line = f"Time Remaining: `{convert_seconds(time_remaining)}`"
+            size_line = f"Size: **{get_formatted_size(current_downloaded)}** / **{get_formatted_size(total_downloaded)}**"
+
+            await self.edit_message.edit(
+                f"{head_text}\n{progress_bar}\n{speed_line}\n{time_line}\n{size_line}",
+                parse_mode="markdown",
+                buttons=[Button.inline("Stop", data=f"stop{self.uuid}")],
+            )
+        except Exception as e:
+            log.error(f"Error in progress_bar: {str(e)}")
+            log.debug(traceback.format_exc())
+
+    async def send_media(self, shorturl):
+        try:
+            log.info(f"Sending media for file: {self.data.get('file_name', 'Unknown')}")
+
+            self.thumbnail.seek(0) if self.thumbnail else None
+
+            try:
+                log.debug("Attempting to send file using Telethon's _file_to_media")
+                spoiler_media = (
+                    await self.client._file_to_media(
+                        self.data["direct_link"],
+                        supports_streaming=True,
+                        progress_callback=self.progress_bar,
+                        thumb=self.thumbnail,
+                    )
+                )[1]
+                spoiler_media.spoiler = True
+
+                log.debug("Sending file to user")
+                file = await self.client.send_file(
+                    self.message.chat.id,
+                    file=spoiler_media,
+                    caption=self.caption,
+                    allow_cache=True,
+                    force_document=False,
+                    parse_mode="markdown",
+                    reply_to=self.message.id,
+                    supports_streaming=True,
+                    background=True,
+                    buttons=[
+                        [
+                            Button.url(
+                                "Direct Link",
+                                url=f"https://{BOT_USERNAME}.t.me?start={self.uuid}",
+                            ),
+                        ],
+                        [
+                            Button.url("Channel ", url="https://t.me/terabox_downloader_by_ronnie"),
+                            Button.url("Group ", url="https://t.me/RonniesVerse"),
+                        ],
+                    ],
+                )
+
+                log.info(f"File sent successfully: {self.data.get('file_name', 'Unknown')}")
+
+            except telethon.errors.rpcerrorlist.WebpageCurlFailedError:
+                log.warning("WebpageCurlFailedError occurred. Falling back to manual download.")
+                path = Path(self.data["file_name"])
+
+                if not os.path.exists(path):
+                    try:
+                        log.debug("Downloading file manually")
+                        download_task = asyncio.create_task(
+                            download_file(
+                                self.data["direct_link"],
+                                self.data["file_name"],
+                                self.progress_bar,
+                            )
+                        )
+                        download = await asyncio.gather(download_task)
+                    except Exception as download_error:
+                        log.error(f"First download attempt failed: {str(download_error)}")
+                        try:
+                            download_task = asyncio.create_task(
+                                download_file(
+                                    self.data["link"],
+                                    self.data["file_name"],
+                                    self.progress_bar,
+                                )
+                            )
+                            download = await asyncio.gather(download_task)
+                        except Exception as second_download_error:
+                            log.error(f"Second download attempt failed: {str(second_download_error)}")
+                            return await self.handle_failed_download()
+                else:
+                    download = [path]
+
+                if not download or not download[0] or not os.path.exists(download[0]):
+                    return await self.handle_failed_download()
+
+                self.download = Path(download[0])
+
+                try:
+                    with open(self.download, "rb") as out:
+                        log.debug("Uploading downloaded file")
+                        res = await upload_file(
+                            self.client, out, self.progress_bar, self.data["file_name"]
+                        )
+                        attributes, mime_type = utils.get_attributes(
+                            self.download,
+                        )
+
+                        file = await self.client.send_file(
+                            self.message.chat.id,
+                            file=res,
+                            caption=self.caption,
+                            background=True,
+                            reply_to=self.message.id,
+                            allow_cache=True,
+                            force_document=False,
+                            parse_mode="markdown",
+                            supports_streaming=True,
+                            thumb=self.thumbnail,
+                            mime_type=mime_type,
+                            buttons=[
+                                [
+                                    Button.url(
+                                        "Direct Link",
+                                        url=f"https://{BOT_USERNAME}.t.me?start={self.uuid}",
+                                    ),
+                                ],
+                                [
+                                    Button.url("Channel ", url="https://t.me/terabox_downloader_by_ronnie"),
+                                    Button.url(
+                                        "Group ", url="https://t.me/RonniesVerse"
+                                    ),
+                                ],
+                            ],
+                        )
+
+                        log.info(
+                            f"File uploaded successfully after manual download: {self.data.get('file_name', 'Unknown')}")
+
+                        # Clean up temporary files
+                        try:
+                            os.unlink(self.download)
+                        except Exception as cleanup_error:
+                            log.warning(f"Could not remove downloaded file: {str(cleanup_error)}")
+
+                        try:
+                            os.unlink(self.data["file_name"])
+                        except Exception as cleanup_error:
+                            log.warning(f"Could not remove original file: {str(cleanup_error)}")
+
+                except Exception as upload_error:
+                    log.error(f"Error uploading downloaded file: {str(upload_error)}")
+                    log.debug(traceback.format_exc())
+                    self.client.remove_event_handler(
+                        self.stop, events.CallbackQuery(pattern=f"^stop{self.uuid}")
+                    )
+
+                    # Clean up files
+                    try:
+                        os.unlink(self.download)
+                    except Exception:
+                        pass
+                    try:
+                        os.unlink(self.data["file_name"])
+                    except Exception:
+                        pass
+
+                    return await self.handle_failed_download()
+
+            # Save and forward file
+            await self.save_forward_file(file, shorturl)
+
+        except Exception as e:
+            log.error(f"Unexpected error in send_media: {str(e)}")
+            log.debug(traceback.format_exc())
+            return await self.handle_failed_download()
+
+    async def handle_failed_download(self):
+        try:
+            log.warning(f"Handling failed download for file: {self.data.get('file_name', 'Unknown')}")
+
+            try:
+                os.unlink(self.data["file_name"])
+            except Exception:
+                pass
+
+            try:
+                os.unlink(self.download)
+            except Exception:
+                pass
+
+            try:
+                await self.edit_message.edit(
+                    f"Sorry! Download Failed but you can download it from [here]({self.data['direct_link']}) or [here]({self.data['link']}).",
+                    parse_mode="markdown",
+                    buttons=[Button.url("Download", url=self.data["direct_link"])],
+                )
+            except Exception as edit_error:
+                log.error(f"Error editing message during failed download: {str(edit_error)}")
+
+        except Exception as e:
+            log.error(f"Unexpected error in handle_failed_download: {str(e)}")
+            log.debug(traceback.format_exc())
+
+    async def save_forward_file(self, file, shorturl):
+        try:
+            log.info(f"Forwarding file: {self.data.get('file_name', 'Unknown')}")
+
+            forwarded_message = await self.client.forward_messages(
+                PRIVATE_CHAT_ID,
+                [file],
+                from_peer=self.message.chat.id,
+                with_my_score=True,
+                background=True,
+            )
+
+            if forwarded_message[0].id:
+                log.debug(f"File forwarded successfully. Message ID: {forwarded_message[0].id}")
+                db.set_key(self.uuid, forwarded_message[0].id)
+                db.set_key(f"mid_{forwarded_message[0].id}", self.uuid)
+                db.set_key(shorturl, forwarded_message[0].id)
+
+            self.client.remove_event_handler(
+                self.stop, events.CallbackQuery(pattern=f"^stop{self.uuid}")
+            )
+
+            try:
+                await self.edit_message.delete()
+            except Exception as delete_error:
+                log.warning(f"Could not delete edit message: {str(delete_error)}")
+
+            try:
+                os.unlink(self.data["file_name"])
+            except Exception as unlink_error:
+                log.warning(f"Could not remove file: {str(unlink_error)}")
+
+            try:
+                os.unlink(self.download)
+            except Exception as unlink_error:
+                log.warning(f"Could not remove download: {str(unlink_error)}")
+
+            db.set(self.message.sender_id, time.monotonic(), ex=60)
+
+        except Exception as e:
+            log.error(f"Unexpected error in save_forward_file: {str(e)}")
+            log.debug(traceback.format_exc())
+
+    async def send_video(self):
+        try:
+            log.info(f"Starting video sending process for: {self.data.get('file_name', 'Unknown')}")
+
+            self.thumbnail = download_image_to_bytesio(self.data["thumb"], "thumbnail.png")
+            shorturl = extract_code_from_url(self.url)
+
+            if not shorturl:
+                log.warning("Invalid short URL")
+                return await self.edit_message.edit("Seems like your link is invalid.")
+
+            try:
+                await self.edit_message.delete()
+            except Exception as delete_error:
+                log.warning(f"Could not delete edit message: {str(delete_error)}")
+
+            db.set(self.message.sender_id, time.monotonic(), ex=60)
+
+            self.edit_message = await self.message.reply(
+                self.caption2, file=self.thumbnail, parse_mode="markdown"
+            )
+
+            # Create a cancellable task
+            self.task = asyncio.create_task(self.send_media(shorturl))
+
+            try:
+                await self.task
+            except asyncio.CancelledError:
+                # Handle cancellation
+                log.info(f"Download cancelled for file: {self.data.get('file_name', 'Unknown')}")
+                await self.edit_message.edit("Download cancelled.")
+
+                # Cleanup
+                try:
+                    os.unlink(self.data["file_name"])
+                except Exception:
+                    pass
+
+                try:
+                    os.unlink(self.download)
+                except Exception:
+                    pass
+
+        except Exception as e:
+            log.error(f"Unexpected error in send_video: {str(e)}")
+            log.debug(traceback.format_exc())
+
+    async def stop(self, event):
+        try:
+            log.info(f"Stopping file transfer for: {self.data.get('file_name', 'Unknown')}")
+
+            self.task.cancel()
+
+            self.client.remove_event_handler(
+                self.stop, events.CallbackQuery(pattern=f"^stop{self.uuid}")
+            )
+
+            await event.answer("Process stopped.")
+
+            try:
+                os.unlink(self.data["file_name"])
+            except Exception:
+                pass
+
+            try:
+                os.unlink(self.download)
+            except Exception:
+                pass
+
+            try:
+                await self.edit_message.delete()
+            except Exception:
+                pass
+
+        except Exception as e:
+            log.error(f"Unexpected error in stop method: {str(e)}")
+            log.debug(traceback.format_exc())
+
+    def get_thumbnail(self):
+        try:
+            log.debug(f"Getting thumbnail for: {self.data.get('file_name', 'Unknown')}")
+            return download_image_to_bytesio(self.data["thumb"], "thumbnail.png")
+        except Exception as e:
+            log.error(f"Error getting thumbnail: {str(e)}")
+            log.debug(traceback.format_exc())
+            return None
+
+    @staticmethod
+    async def forward_file(
+            client: TelegramClient,
+            file_id: int,
+            message: Message,
+            edit_message: UpdateEditMessage = None,
+            uid: str = None,
+    ):
+        try:
+            log.info(f"Forwarding file with ID: {file_id}")
+
+            if edit_message:
+                try:
+                    await edit_message.delete()
+                except Exception as delete_error:
+                    log.warning(f"Could not delete edit message: {str(delete_error)}")
+
+            result = await client(
+                GetMessagesRequest(channel=PRIVATE_CHAT_ID, id=[int(file_id)])
+            )
+
+            msg: Message = result.messages[0] if result and result.messages else None
+
+            if not msg:
+                log.warning(f"No message found for file ID: {file_id}")
+                return False
+
+            media: Document = (
+                msg.media.document
+                if hasattr(msg, "media") and msg.media.document
+                else None
+            )
+
+            try:
+                await message.reply(
+                    message=msg.message,
+                    file=media,
+                    background=True,
+                    reply_to=message.id,
+                    force_document=False,
+                    buttons=[
+                        [
+                            Button.url(
+                                "Direct Link",
+                                url=f"https://{BOT_USERNAME}.t.me?start={uid}",
+                            ),
+                        ],
+                    ],
+                    parse_mode="markdown",
+                )
+
+                log.info(f"Successfully forwarded file for user {message.sender_id}")
+
+                db.set(message.sender_id, time.monotonic(), ex=60)
+                db.incr(
+                    f"check_{message.sender_id}",
+                    1,
+                )
+
+                return True
+
+            except Exception as forward_error:
+                log.error(f"Error forwarding file: {str(forward_error)}")
+                log.debug(traceback.format_exc())
+                return False
+
+        except Exception as e:
+            log.error(f"Unexpected error in forward_file: {str(e)}")
+            log.debug(traceback.format_exc())
+            return False
+
+
+# ---- End of send_media.py ----
+
+# ---- Start of terabox.py ----
+import json
+import logging
+import re
+import time
+import traceback
+from urllib.parse import urlparse, parse_qs
+
+import requests
+import aiohttp
+
+from config import COOKIE
+from tools import get_formatted_size
+from logger_config import setup_logger
+
+# Setup logger
+log = setup_logger('terabox_downloader')
+
+
+def check_url_patterns(url):
+    patterns = [
+        r"ww\.mirrobox\.com", r"www\.nephobox\.com", r"freeterabox\.com",
+        r"www\.freeterabox\.com", r"1024tera\.com", r"4funbox\.co",
+        r"www\.4funbox\.com", r"mirrobox\.com", r"nephobox\.com",
+        r"terabox\.app", r"terabox\.com", r"www\.terabox\.ap",
+        r"www\.terabox\.com", r"www\.1024tera\.co", r"www\.momerybox\.com",
+        r"teraboxapp\.com", r"momerybox\.com", r"tibibox\.com",
+        r"www\.tibibox\.com", r"www\.teraboxapp\.com", r"www\.teraboxlink\.com",
+        r"teraboxlink\.com", r"www\.terasharelink\.com", r"terasharelink\.com",
+        r"www\.teraboxapp\.com", r"teraboxapp\.com", r"www\.terafileshare\.com",
+        r"terafileshare\.com", r"www\.teraboxshare\.com", r"teraboxshare\.com",
+        r"www\.1024tera\.com"
+    ]
+
+    for pattern in patterns:
+        if re.search(pattern, url):
+            return True
+    return False
+
+
+def get_urls_from_string(string: str) -> list[str]:
+    """
+    Extracts URLs from a given string.
+    """
+    try:
+        pattern = r"(https?://\S+)"
+        urls = re.findall(pattern, string)
+        urls = [url for url in urls if check_url_patterns(url)]
+
+        if not urls:
+            log.warning(f"No valid URLs found in string: {string}")
+            return []
+
+        log.info(f"Found valid URL: {urls[0]}")
+        return urls[0]
+    except Exception as e:
+        log.error(f"Error in get_urls_from_string: {str(e)}")
+        log.debug(traceback.format_exc())
+        return []
+
+
+def find_between(data: str, first: str, last: str) -> str | None:
+    """
+    Searches for the first occurrence of the `first` string in `data`,
+    and returns the text between the two strings.
+    """
+    try:
+        start = data.index(first) + len(first)
+        end = data.index(last, start)
+        return data[start:end]
+    except ValueError:
+        log.warning(f"Could not find text between '{first}' and '{last}'")
+        return None
+
+
+def extract_surl_from_url(url: str) -> str | None:
+    """
+    Extracts the surl parameter from a given URL.
+    """
+    try:
+        parsed_url = urlparse(url)
+        query_params = parse_qs(parsed_url.query)
+        surl = query_params.get("surl", [])
+
+        if surl:
+            log.info(f"Extracted surl: {surl[0]}")
+            return surl[0]
+        else:
+            log.warning(f"No surl found in URL: {url}")
+            return False
+    except Exception as e:
+        log.error(f"Error in extract_surl_from_url: {str(e)}")
+        log.debug(traceback.format_exc())
+        return False
+
+
+async def get_data(url: str):
+    try:
+        # Use regular requests for metadata fetching
+        session = requests.Session()
+
+        headersList = {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
+            "Connection": "keep-alive",
+            "Cookie": COOKIE,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        }
+
+        # Initial request
+        response = session.get(url, headers=headersList)
+        response = session.get(response.url, headers=headersList)
+
+        text = response.text
+        default_thumbnail = find_between(text, 'og:image" content="', '"')
+        logid = find_between(text, "dp-logid=", "&")
+        jsToken = find_between(text, "fn%28%22", "%22%29")
+        shorturl = extract_surl_from_url(str(response.url))
+
+        if not shorturl:
+            return False
+
+        reqUrl = f"https://www.terabox.app/share/list?app_id=250528&web=1&channel=0&jsToken={jsToken}&dp-logid={logid}&page=1&num=20&by=name&order=asc&site_referer=&shorturl={shorturl}&root=1"
+
+        # Get file list
+        response = session.get(reqUrl, headers=headersList)
+        r_j = response.json()
+
+        if not response.status_code == 200:
+            return False
+
+        if r_j["errno"]:
+            return False
+
+        if "list" not in r_j and not r_j["list"]:
+            return False
+
+        list_data = r_j.get("list", [])[0]
+
+        # Get direct link
+        response = session.head(r_j["list"][0]["dlink"], headers=headersList)
+        direct_link = response.headers.get("location")
+
+        data = {
+            "file_name": list_data.get("server_filename"),
+            "link": list_data.get("dlink"),
+            "direct_link": direct_link,
+            "thumb": (
+                list_data["thumbs"].get("url3")
+                if "thumbs" in list_data
+                else default_thumbnail
+            ),
+            "size": get_formatted_size(int(list_data["size"])),
+            "sizebytes": int(list_data["size"])
+        }
+
+        return data
+
+    except Exception as e:
+        log.error(f"Error in get_data: {str(e)}")
+        log.error(f"Primary method failed: {str(e)}")
+        log.info(f"Start to fetch multiple videos...")
+
+        try:
+            # Fallback Mechanism using API from network traffic
+            # Extract shorturl from the URL
+            # Fallback API Endpoint
+            info_url = f"https://terabox.hnn.workers.dev/api/get-info"
+            params = {
+                "shorturl": shorturl,
+                "pwd": ""
+            }
+
+            # Fetch file information using fallback API
+            info_response = requests.get(info_url, params=params)
+
+            if info_response.status_code != 200:
+                log.error(f"Fallback info fetch failed: {info_response.status_code}")
+                return False
+
+            file_info = info_response.json()
+            log.info(f"Fallback API Response: {file_info}")
+
+            # Check if files exist
+            if not file_info.get('list'):
+                log.error("No files found in fallback method")
+                return False
+
+            # Check if it's a directory with multiple files
+            current_list = file_info['list'][0]
+
+            # Multiple files scenario (with children)
+            if current_list.get('is_dir') == '1' and 'children' in current_list:
+                files = current_list.get('children', [])
+                processed_files = []
+
+                for file_details in files:
+                    # Skip directories
+                    if file_details.get('is_dir') == '1':
+                        continue
+
+                    # Prepare download payload
+                    download_payload = {
+                        'shareid': file_info.get('shareid'),
+                        'uk': file_info.get('uk'),
+                        'sign': file_info.get('sign'),
+                        'timestamp': file_info.get('timestamp'),
+                        'fs_id': file_details.get('fs_id')
+                    }
+
+                    # Get download link
+                    download_response = requests.post(
+                        'https://terabox.hnn.workers.dev/api/get-download',
+                        json=download_payload
+                    )
+
+                    if download_response.status_code != 200:
+                        log.error(f"Download link fetch failed for a file: {download_response.status_code}")
+                        continue
+
+                    download_data = download_response.json()
+
+                    # Construct file data
+                    file_data = {
+                        "file_name": file_details.get('filename'),
+                        "link": download_data.get('downloadLink'),
+                        "direct_link": download_data.get('downloadLink'),
+                        "thumb": default_thumbnail,
+                        "size": get_formatted_size(int(file_details.get('size', 0))),
+                        "sizebytes": int(file_details.get('size', 0))
+                    }
+
+                    processed_files.append(file_data)
+
+                # Return list of files
+                return processed_files
+
+            # Single file scenario
+            download_payload = {
+                'shareid': file_info.get('shareid'),
+                'uk': file_info.get('uk'),
+                'sign': file_info.get('sign'),
+                'timestamp': file_info.get('timestamp'),
+                'fs_id': current_list.get('fs_id')
+            }
+
+            # Get download link
+            download_response = requests.post(
+                'https://terabox.hnn.workers.dev/api/get-download',
+                json=download_payload
+            )
+
+            if download_response.status_code != 200:
+                log.error(f"Download link fetch failed: {download_response.status_code}")
+                return False
+
+            download_data = download_response.json()
+            print("DOWNLOAD DATA:", download_data)
+
+            # Construct single file data
+            single_file_data = {
+                "file_name": current_list.get('filename'),
+                "link": download_data.get('downloadLink'),
+                "direct_link": download_data.get('downloadLink'),
+                "thumb": default_thumbnail,
+                "size": get_formatted_size(int(current_list.get('size', 0))),
+                "sizebytes": int(current_list.get('size', 0))
+            }
+
+            return single_file_data
+
+        except Exception as fallback_error:
+            log.error(f"Fallback mechanism completely failed: {fallback_error}")
+            log.error(traceback.format_exc())  # Add full traceback for more details
+            return False
+
+
+
+def ensure_mp4_extension(filename):
+    if not filename:
+        filename = f"video_{int(time.time())}.mp4"
+    if not filename.lower().endswith('.mp4'):
+        filename += '.mp4'
+    return filename
+
+# ---- End of terabox.py ----
+
+# ---- Start of tools.py ----
+import os
+import re
+import traceback
+import uuid
+from contextlib import suppress
+from io import BytesIO
+from urllib.parse import parse_qs, urlparse
+
+import requests
+from PIL import Image
+from telethon import TelegramClient
+from telethon.tl.functions.channels import GetParticipantRequest
+from telethon.tl.types import ChannelParticipantLeft, ChannelParticipantBanned
+
+from config import BOT_USERNAME
+from redis_db import db
+from logger_config import setup_logger
+
+import aiohttp
+import asyncio
+import time
+from typing import Callable
+
+# Setup logger
+log = setup_logger('terabox_tools')
+
+
+def check_url_patterns(url: str) -> bool:
+    """
+    Check if the given URL matches known URL patterns.
+    """
+    try:
+        patterns = [
+            r"ww\.mirrobox\.com", r"www\.nephobox\.com", r"freeterabox\.com",
+            r"www\.freeterabox\.com", r"1024tera\.com", r"4funbox\.co",
+            r"www\.4funbox\.com", r"mirrobox\.com", r"nephobox\.com",
+            r"terabox\.app", r"terabox\.com", r"www\.terabox\.ap",
+            r"www\.terabox\.com", r"www\.1024tera\.co", r"www\.momerybox\.com",
+            r"teraboxapp\.com", r"momerybox\.com", r"tibibox\.com",
+            r"www\.tibibox\.com", r"www\.teraboxapp\.com", r"www\.teraboxlink\.com",
+            r"teraboxlink\.com", r"www\.terasharelink\.com", r"terasharelink\.com",
+            r"www\.teraboxapp\.com", r"teraboxapp\.com", r"www\.terafileshare\.com",
+            r"terafileshare\.com", r"www\.teraboxshare\.com", r"teraboxshare\.com",
+            r"www\.1024tera\.com"
+        ]
+
+        for pattern in patterns:
+            if re.search(pattern, url):
+                log.debug(f"URL {url} matched pattern {pattern}")
+                return True
+
+        log.warning(f"URL {url} did not match any known patterns")
+        return False
+    except Exception as e:
+        log.error(f"Error in check_url_patterns: {str(e)}")
+        log.debug(traceback.format_exc())
+        return False
+
+
+def extract_code_from_url(url: str) -> str | None:
+    """
+    Extracts the code from a URL.
+    """
+    try:
+        pattern1 = r"/s/(\w+)"
+        pattern2 = r"surl=(\w+)"
+
+        match = re.search(pattern1, url)
+        if match:
+            log.info(f"Extracted code from URL using pattern1: {match.group(1)}")
+            return match.group(1)
+
+        match = re.search(pattern2, url)
+        if match:
+            log.info(f"Extracted code from URL using pattern2: {match.group(1)}")
+            return match.group(1)
+
+        log.warning(f"No code found in URL: {url}")
+        return None
+    except Exception as e:
+        log.error(f"Error in extract_code_from_url: {str(e)}")
+        log.debug(traceback.format_exc())
+        return None
+
+
+def get_urls_from_string(string: str) -> str | None:
+    """
+    Extracts all URLs from a given string.
+    """
+    try:
+        pattern = r"(https?://\S+)"
+        urls = re.findall(pattern, string)
+        urls = [url for url in urls if check_url_patterns(url)]
+
+        if not urls:
+            log.warning(f"No valid URLs found in string: {string}")
+            return None
+
+        log.info(f"Found valid URL: {urls[0]}")
+        return urls[0]
+    except Exception as e:
+        log.error(f"Error in get_urls_from_string: {str(e)}")
+        log.debug(traceback.format_exc())
+        return None
+
+
+def extract_surl_from_url(url: str) -> str:
+    """
+    Extracts the surl from a URL.
+    """
+    try:
+        parsed_url = urlparse(url)
+        query_params = parse_qs(parsed_url.query)
+        surl = query_params.get("surl", [])
+
+        if surl:
+            log.info(f"Extracted surl: {surl[0]}")
+            return surl[0]
+        else:
+            log.warning(f"No surl found in URL: {url}")
+            return False
+    except Exception as e:
+        log.error(f"Error in extract_surl_from_url: {str(e)}")
+        log.debug(traceback.format_exc())
+        return False
+
+
+def get_formatted_size(size_bytes: int) -> str:
+    """
+    Returns a human-readable file size.
+    """
+    try:
+        if size_bytes >= 1024 * 1024:
+            size = size_bytes / (1024 * 1024)
+            unit = "MB"
+        elif size_bytes >= 1024:
+            size = size_bytes / 1024
+            unit = "KB"
+        else:
+            size = size_bytes
+            unit = "b"
+
+        formatted_size = f"{size:.2f} {unit}"
+        log.debug(f"Converted {size_bytes} bytes to {formatted_size}")
+        return formatted_size
+    except Exception as e:
+        log.error(f"Error in get_formatted_size: {str(e)}")
+        log.debug(traceback.format_exc())
+        return "0 b"
+
+
+def convert_seconds(seconds: int) -> str:
+    """
+    Convert seconds into a human-readable format.
+    """
+    try:
+        seconds = int(seconds)
+        hours = seconds // 3600
+        remaining_seconds = seconds % 3600
+        minutes = remaining_seconds // 60
+        remaining_seconds_final = remaining_seconds % 60
+
+        if hours > 0:
+            result = f"{hours}h:{minutes}m:{remaining_seconds_final}s"
+        elif minutes > 0:
+            result = f"{minutes}m:{remaining_seconds_final}s"
+        else:
+            result = f"{remaining_seconds_final}s"
+
+        log.debug(f"Converted {seconds} seconds to {result}")
+        return result
+    except Exception as e:
+        log.error(f"Error in convert_seconds: {str(e)}")
+        log.debug(traceback.format_exc())
+        return "0s"
+
+
+async def is_user_on_chat(bot: TelegramClient, chat_id: int, user_id: int) -> bool:
+    """
+    Check if a user is present in a specific chat.
+    """
+    try:
+        log.info(f"Checking if user {user_id} is on chat {chat_id}")
+        check = await bot.get_permissions(chat_id, user_id)
+        log.debug(f"User permissions: {check}")
+        return check
+    except Exception as e:
+        log.error(f"Error checking user on chat: {str(e)}")
+        log.debug(traceback.format_exc())
+        return False
+
+
+async def download_file(url: str, filename: str, callback: Callable = None) -> str | bool:
+    """
+    Optimized asynchronous file download with speed tracking and chunked transfer
+    """
+    try:
+        log.info(f"Starting download from {url}")
+        
+        # Configure timeout and chunk size
+        timeout = aiohttp.ClientTimeout(total=None, connect=60)
+        chunk_size = 1024 * 1024  # 1MB chunks
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Referer": "https://terabox.com/",
+            "Origin": "https://terabox.com"
+        }
+        cookies = {
+            'ndus': 'Yzwct3HteHuiA-J3WyKhtzVYqg6MC9c0z2gxg562',
+            'csrfToken': '5OHl0vNoavjJXJlLo7wqg8ae',
+            'lang': 'en',
+            'browserid': '5CKEOlmkcvD7gUObuDnBjTHYQPZHXt7xDxpLJpSHCbS8uUS7V2q9jnVwT0k='
+        }
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(url, headers=headers, cookies=cookies) as response:
+                if response.status not in [200, 206]:
+                    log.error(f"Download failed with status {response.status}")
+                    return False
+
+                total_size = int(response.headers.get('content-length', 0))
+                downloaded_size = 0
+                start_time = time.time()
+                
+                with open(filename, 'wb') as f:
+                    async for chunk in response.content.iter_chunked(chunk_size):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded_size += len(chunk)
+
+                            # Calculate elapsed time and avoid zero-division
+                            elapsed_time = time.time() - start_time
+                            if elapsed_time > 0:
+                                speed = downloaded_size / (1024 * 1024 * elapsed_time)  # MB/s
+                            else:
+                                speed = 0  # or set a default value for speed when elapsed_time is zero
+
+                            if callback:
+                                await callback(
+                                    downloaded_size, 
+                                    total_size,
+                                    f"Downloading • {speed:.2f} MB/s"
+                                )
+                
+                log.info(f"Download completed: {filename}")
+                return filename
+
+    except asyncio.CancelledError:
+        log.warning("Download cancelled")
+        raise
+    except Exception as e:
+        log.error(f"Error downloading file: {str(e)}")
+        log.debug(traceback.format_exc())
+        return False
+
+
+def save_image_from_bytesio(image_bytesio, filename):
+    """
+    Save an image from BytesIO to a file.
+    """
+    try:
+        image_bytesio.seek(0)
+        image = Image.open(image_bytesio)
+        image.save(filename)
+        image.close()
+
+        log.info(f"Successfully saved image to {filename}")
+        return filename
+    except Exception as e:
+        log.error(f"Error saving image: {str(e)}")
+        log.debug(traceback.format_exc())
+        return False
+
+
+def download_image_to_bytesio(url: str, filename: str) -> BytesIO | None:
+    """
+    Downloads an image from a URL and returns it as a BytesIO object.
+    """
+    try:
+        log.info(f"Downloading image from {url}")
+        response = requests.get(url)
+        content = BytesIO()
+        content.name = filename
+
+        if response.status_code == 200:
+            for chunk in response.iter_content(chunk_size=1024):
+                content.write(chunk)
+            log.info(f"Successfully downloaded image to {filename}")
+        else:
+            log.warning(f"Failed to download image. Status code: {response.status_code}")
+            return None
+
+        content.seek(0)
+        return content
+    except Exception as e:
+        log.error(f"Error downloading image: {str(e)}")
+        log.debug(traceback.format_exc())
+        return None
+
+
+def remove_all_videos():
+    """
+    Remove all video files from the current directory.
+    """
+    try:
+        current_directory = os.getcwd()
+        video_extensions = [".mp4", ".mkv", ".webm"]
+
+        log.info("Starting to remove all video files")
+        for file_name in os.listdir(current_directory):
+            if any(file_name.lower().endswith(ext) for ext in video_extensions):
+                file_path = os.path.join(current_directory, file_name)
+                os.remove(file_path)
+                log.debug(f"Removed video file: {file_path}")
+
+        log.info("Completed removing video files")
+    except Exception as e:
+        log.error(f"Error removing video files: {str(e)}")
+        log.debug(traceback.format_exc())
+
+
+def generate_shortenedUrl(sender_id: int):
+    """
+    Generate a shortened URL for sharing.
+    """
+    try:
+        log.info(f"Generating shortened URL for sender {sender_id}")
+        uid = str(uuid.uuid4())
+        data = requests.get(
+            "https://publicearn.com/api",
+            params={
+                "api": PUBLIC_EARN_API,
+                "url": f"https://t.me/{BOT_USERNAME}?start=token_{uid}",
+                "alias": uid.split("-", maxsplit=2)[0],
+            },
+        )
+        data.raise_for_status()
+        data_json = data.json()
+
+        if data_json.get("status") == "success":
+            url = data_json.get("shortenedUrl")
+            db.set(f"token_{uid}", f"{sender_id}|{url}", ex=21600)
+            log.info(f"Successfully generated shortened URL: {url}")
+            return url
+        else:
+            log.warning("Failed to generate shortened URL")
+            return None
+    except Exception as e:
+        log.error(f"Error generating shortened URL: {str(e)}")
+        log.debug(traceback.format_exc())
+        return None
+
+
+# In tools.py, modify the check_force_sub function
+
+async def check_force_sub(client, user_id, channel_username, group_username):
+    """
+    Check if a user has subscribed to both a specific channel and group.
+    """
+    try:
+        log.info(f"Checking subscription for user {user_id} on channel {channel_username} and group {group_username}")
+
+        # Check channel subscription
+        try:
+            channel = await client.get_entity(channel_username)
+            channel_participant = await client(GetParticipantRequest(
+                channel=channel,
+                participant=user_id
+            ))
+
+            if isinstance(channel_participant.participant, (ChannelParticipantLeft, ChannelParticipantBanned)):
+                log.warning(f"User {user_id} is left or banned from channel")
+                return False
+        except Exception as channel_error:
+            log.error(f"Error checking channel subscription: {str(channel_error)}")
+            return False
+
+        # Check group subscription
+        try:
+            group = await client.get_entity(group_username)
+            group_participant = await client(GetParticipantRequest(
+                channel=group,
+                participant=user_id
+            ))
+
+            if isinstance(group_participant.participant, (ChannelParticipantLeft, ChannelParticipantBanned)):
+                log.warning(f"User {user_id} is left or banned from group")
+                return False
+        except Exception as group_error:
+            log.error(f"Error checking group subscription: {str(group_error)}")
+            return False
+
+        log.info(f"User {user_id} is a valid participant in both channel and group")
+        return True
+
+    except Exception as e:
+        log.error(f"Unexpected error in check_force_sub: {str(e)}")
+        log.debug(traceback.format_exc())
+        return False
+
+
+
+# ---- End of tools.py ----
+
+# ---- Start of video_coordinator.py ----
+# video_coordinator.py
+from redis_db import db
+import json
+import time
+from logger_config import setup_logger
+
+log = setup_logger('video_coordinator')
+
+class VideoCoordinator:
+    def __init__(self, redis_client):
+        self.redis = redis_client
+        self.processing_key = "processing_videos"
+        self.cache_key = "video_cache"
+        self.lock_timeout = 300  # 5 minutes
+        self.cache_timeout = 3600  # 1 hour
+
+    async def is_video_processing(self, video_url: str) -> bool:
+        """Check if video is currently being processed"""
+        return bool(self.redis.get(f"{self.processing_key}:{video_url}"))
+
+    async def set_video_processing(self, video_url: str) -> None:
+        """Mark video as being processed"""
+        self.redis.set(f"{self.processing_key}:{video_url}", "1", ex=self.lock_timeout)
+
+    async def remove_video_processing(self, video_url: str) -> None:
+        """Remove processing mark for video"""
+        self.redis.delete(f"{self.processing_key}:{video_url}")
+
+    async def cache_video(self, video_url: str, file_id: str) -> None:
+        """Cache video file_id"""
+        self.redis.set(f"{self.cache_key}:{video_url}", file_id, ex=self.cache_timeout)
+
+    async def get_cached_video(self, video_url: str) -> str:
+        """Get cached video file_id"""
+        return self.redis.get(f"{self.cache_key}:{video_url}")
+
+    async def remove_from_cache(self, video_url: str) -> None:
+        """Remove video from cache"""
+        self.redis.delete(f"{self.cache_key}:{video_url}")
+
+# ---- End of video_coordinator.py ----
+

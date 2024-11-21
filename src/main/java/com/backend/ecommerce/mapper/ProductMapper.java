@@ -11,7 +11,9 @@ import com.backend.ecommerce.repository.SizeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
@@ -69,10 +71,10 @@ public class ProductMapper implements EntityDTOMapper<Product, ProductDTO> {
     @Override
     public Product reverse(ProductDTO dto) {
         // Fetch the category entities based on the categoryIds in the DTO
-        List<Category> categories = dto.categoryIds().stream()
+        Set<Category> categories = dto.categoryIds().stream()
                 .map(categoryId -> categoryRepository.findById(categoryId)
                         .orElseThrow(() -> new RuntimeException("Category not found: " + categoryId)))
-                .collect(Collectors.toList());
+                .collect(Collectors.toSet());
 
         // Convert size names to Size entities
         List<Size> sizes = dto.sizes().stream()
@@ -85,6 +87,8 @@ public class ProductMapper implements EntityDTOMapper<Product, ProductDTO> {
                 .map(colorName -> colorRepository.findByName(colorName)
                         .orElseThrow(() -> new RuntimeException("Color not found: " + colorName)))
                 .toList();
+
+
 
         // Create a new Product entity and set the fields from the DTO
         Product product = new Product();

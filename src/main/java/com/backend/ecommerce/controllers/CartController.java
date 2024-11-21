@@ -35,16 +35,12 @@ public class CartController {
     }
 
     @DeleteMapping("/remove")
-    public ResponseEntity<String> removeProductFromCart(
-            @RequestParam Long userId,
-            @RequestParam Long productId) {
+    public ResponseEntity<String> removeProductFromCart(@PathVariable Long userId) {
         try {
-            System.out.println("Entering removeProductFromCart method in controller...");
-            cartService.removeProductFromCart(userId, productId);
-            System.out.println("going to implementation...");
+            cartService.removeProductFromCart(userId);
             return ResponseEntity.ok("Product removed from cart successfully");
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body("Unable to clear cart: " + e.getMessage());
         }
     }
 

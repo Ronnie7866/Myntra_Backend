@@ -6,7 +6,9 @@ import com.backend.ecommerce.enums.TransactionType;
 import com.backend.ecommerce.implementation.OrderServiceImplementation;
 import com.backend.ecommerce.service.OrderService;
 import com.backend.ecommerce.service.payment.CheckoutService;
+import com.stripe.model.Refund;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,15 +26,21 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("api/orders")
-@RequiredArgsConstructor
 public class OrderController {
 
     private final CheckoutService checkoutService;
     private final OrderServiceImplementation orderService;
     private final StripeService stripeService;
 
+    @Autowired
+    public OrderController(CheckoutService checkoutService, OrderServiceImplementation orderService, StripeService stripeService) {
+        this.checkoutService = checkoutService;
+        this.orderService = orderService;
+        this.stripeService = stripeService;
+    }
+
     @PostMapping("/create-payment-intent")
-    public ResponseEntity<Map<String, String>> createPaymentIntent(@RequestParam Long userId,
+    public ResponseEntity<?> createPaymentIntent(@RequestParam Long userId,
                                                                    @RequestParam BigDecimal amount) {
         try {
             PaymentIntent paymentIntent = stripeService.createPaymentIntent(amount, "usd");
@@ -40,7 +48,7 @@ public class OrderController {
             response.put("clientSecret", paymentIntent.getClientSecret());
             return ResponseEntity.ok(response);
         } catch (StripeException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error creating PaymentIntent: " + e.getMessage());
         }
     }
 
@@ -99,9 +107,23 @@ public ResponseEntity<Order> confirmPaymentAndCreateOrder(@RequestParam Long use
         return checkoutService.checkout(userId, transactionType, transactionAmount);
     }
 
+    @PostMapping("/refund")
+    public ResponseEntity<?> refundPayment(@RequestBody Map<String, String> payload) {
+        try {
+            String paymentIntentId = payload.get("paymentIntentId");
+            Refund refund = stripeService.createRefund(paymentIntentId);
+            Map<String, String> response = new HashMap<>();
+            response.put("refundId", refund.getId());
+            response.put("status", refund.getStatus());
+            return ResponseEntity.ok(response);
+        } catch (StripeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 
     @PostMapping()
     public ResponseEntity<String> createOrder(@RequestBody OrderRequest orderRequest) {
+
         orderService.createOrder(orderRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body("Order created successfully");
     }

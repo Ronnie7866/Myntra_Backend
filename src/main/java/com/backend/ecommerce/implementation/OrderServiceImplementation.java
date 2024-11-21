@@ -52,11 +52,6 @@ public class OrderServiceImplementation implements OrderService {
         // Check inventory and create OrderProducts entities
         for (OrderProductRequest productRequest : orderRequest.getOrderProducts()) {
             Product product = productRepository.findById(productRequest.getProductId()).orElseThrow(() -> new RuntimeException("Product not found"));
-            
-            // Check inventory
-            if (product.getInventory() < productRequest.getQuantity()) {
-                throw new RuntimeException("Not enough inventory for product: " + product.getName());
-            }
 
             // Create OrderProduct entity
             OrderProducts orderProducts = new OrderProducts();
@@ -69,10 +64,6 @@ public class OrderServiceImplementation implements OrderService {
 
             // Add OrderProducts entity to order's list of order Products
             order.getOrderProducts().add(orderProducts);
-
-            // Update product inventory
-            product.setInventory(product.getInventory() - productRequest.getQuantity());
-            productRepository.save(product);
         }
 
         // update the order

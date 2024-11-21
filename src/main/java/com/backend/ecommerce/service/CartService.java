@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 public interface CartService {
     CartProducts addProductToCart(Long userId, Long productId, Integer quantity);
 
-    void removeProductFromCart(Long userId, Long productId);
+    void removeProductFromCart(Long userId);
 
     List<Cart> getAllCarts();
 
